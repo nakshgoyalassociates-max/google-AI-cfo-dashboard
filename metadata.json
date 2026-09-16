@@ -1,0 +1,6 @@
+{
+  "name": "Virtual CFO Suite",
+  "description": "Executive compliance, financial MIS, and action pendency management portal with unified vertical drill-down workspaces for Statutory Compliances and Operational Actions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
