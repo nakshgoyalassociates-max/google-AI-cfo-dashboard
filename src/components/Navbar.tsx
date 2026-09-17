@@ -14,7 +14,9 @@ import {
   Lock,
   LogIn,
   ChevronDown,
-  Layers
+  Layers,
+  ReceiptText,
+  Calculator
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -25,6 +27,7 @@ export const Navbar: React.FC = () => {
     setActiveTab, 
     clientProfile, 
     stats, 
+    invoiceStats,
     resetToDefaultData,
     currentUser,
     setIsAuthModalOpen,
@@ -32,7 +35,8 @@ export const Navbar: React.FC = () => {
     selectedCompanyId,
     setSelectedCompanyId,
     cfoViewMode,
-    setCfoViewMode
+    setCfoViewMode,
+    criticalDelayedItems
   } = useApp();
 
   return (
@@ -184,73 +188,156 @@ export const Navbar: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between overflow-x-auto py-1.5">
           <nav className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === 'dashboard'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>
-                {role === 'cfo' 
-                  ? (cfoViewMode === 'portfolio' ? 'Client Overview (All Companies)' : 'CFO Company Workspace') 
-                  : role === 'client' 
-                    ? 'Client Overview (Executive)' 
-                    : 'Accounts Workstation'}
-              </span>
-            </button>
+            {/* Dashboard Tab - Hidden for Client Team, Available for Client (Executive Summary) and CFO (Portfolio/Surveillance) */}
+            {role !== 'client_team' && (
+              <button
+                id="nav-tab-dashboard"
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'dashboard'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>
+                  {role === 'cfo' 
+                    ? (cfoViewMode === 'portfolio' ? 'CFO Dashboard (All Companies)' : 'CFO Company Workspace') 
+                    : 'Executive Summary Dashboard'}
+                </span>
+                {role === 'cfo' && criticalDelayedItems.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse">
+                    {criticalDelayedItems.length} Critical
+                  </span>
+                )}
+              </button>
+            )}
 
+            {/* Compliance Master - Accessible to All Roles */}
             <button
+              id="nav-tab-compliances"
               onClick={() => setActiveTab('compliances')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === 'compliances'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <CalendarClock className="w-3.5 h-3.5" />
               <span>Compliance Master</span>
-              <span className="ml-1 text-[10px] text-slate-400 font-normal">
+              <span className={`ml-1 text-[10px] font-normal ${activeTab === 'compliances' ? 'text-slate-300' : 'text-slate-400'}`}>
                 ({stats.fullyCompletedCompliances}/{stats.totalCompliances})
               </span>
             </button>
 
+            {/* Action Items - Accessible to All Roles */}
             <button
+              id="nav-tab-actions"
               onClick={() => setActiveTab('actions')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === 'actions'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5" />
               <span>Action Items</span>
               {stats.pendingActions > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] bg-slate-100 text-slate-700 font-medium">
+                <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                  activeTab === 'actions' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
+                }`}>
                   {stats.pendingActions}
                 </span>
               )}
             </button>
 
-            <button
-              onClick={() => setActiveTab('mis')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === 'mis'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Financial MIS</span>
-            </button>
+            {/* Financial MIS - Hidden for Client Team, Available for Client & CFO */}
+            {role !== 'client_team' && (
+              <button
+                id="nav-tab-mis"
+                onClick={() => setActiveTab('mis')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'mis'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Financial MIS</span>
+              </button>
+            )}
+
+            {/* Complete Budget & Variance Analysis - Hidden for Client Team, Available for Client & CFO */}
+            {role !== 'client_team' && (
+              <button
+                id="nav-tab-budget"
+                onClick={() => setActiveTab('budget')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'budget'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                <span>Budget & Variance</span>
+                <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                  activeTab === 'budget' 
+                    ? 'bg-amber-400 text-slate-950' 
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}>
+                  ±5% Alerts
+                </span>
+              </button>
+            )}
+
+            {/* Invoice Tracking - Hidden for Client Team, Available for Client & CFO */}
+            {role !== 'client_team' && (
+              <button
+                id="nav-tab-invoices"
+                onClick={() => setActiveTab('invoices')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'invoices'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <ReceiptText className="w-3.5 h-3.5" />
+                <span>Invoice Tracking</span>
+                {invoiceStats.critical > 0 ? (
+                  <span 
+                    className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse flex items-center gap-0.5" 
+                    title={`${invoiceStats.critical} invoices pending >2 days (SLA Breached)`}
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-white"></span>
+                    {invoiceStats.critical} Critical
+                  </span>
+                ) : (
+                  <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                    activeTab === 'invoices' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {invoiceStats.total}
+                  </span>
+                )}
+              </button>
+            )}
           </nav>
 
           <div className="hidden lg:flex items-center gap-2 text-xs text-slate-500">
-            <span>Signed In As:</span>
-            <span className="font-semibold text-slate-800">
-              {currentUser.name} ({currentUser.roleTitle})
+            {role === 'client_team' ? (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+                Operational Access: Compliance Master & Action Items
+              </span>
+            ) : role === 'client' ? (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Client Executive View (Full Access Excl. CFO Dashboard)
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Virtual CFO Master Control (All Tabs & All Companies)
+              </span>
+            )}
+            <span className="font-semibold text-slate-800 ml-1">
+              {currentUser.name}
             </span>
           </div>
         </div>

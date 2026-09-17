@@ -9,7 +9,13 @@ import {
   FilterOptions,
   SubTask,
   UserAccount,
-  CompanyOverviewSummary
+  CompanyOverviewSummary,
+  CriticalDelayedItem,
+  TrackedInvoice,
+  InvoiceStage,
+  SlaStatus,
+  BudgetLineItem,
+  BudgetMonthKey
 } from '../types';
 import { COMPLIANCE_MASTER_LIST } from '../data/complianceMaster';
 import { 
@@ -24,6 +30,8 @@ import {
   ALL_COMPANIES_COMPLIANCES,
   ALL_COMPANIES_ACTIONS
 } from '../data/companyData';
+import { INITIAL_TRACKED_INVOICES } from '../data/mockInvoices';
+import { INITIAL_NEXORA_BUDGET_ITEMS } from '../data/mockBudgetData';
 
 interface AppContextType {
   role: Role;
@@ -42,8 +50,21 @@ interface AppContextType {
   drillDownToCompany: (companyId: string) => void;
   returnToPortfolio: () => void;
   allCompaniesOverview: CompanyOverviewSummary[];
-  activeTab: 'dashboard' | 'compliances' | 'actions' | 'mis';
-  setActiveTab: (tab: 'dashboard' | 'compliances' | 'actions' | 'mis') => void;
+  criticalDelayedItems: CriticalDelayedItem[];
+  approveCfoComplianceReview: (companyId: string, complianceId: string) => void;
+  switchCompanyAndTab: (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => void;
+  activeTab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget';
+  setActiveTab: (tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => void;
+  budgetItems: BudgetLineItem[];
+  selectedBudgetMonth: BudgetMonthKey;
+  setSelectedBudgetMonth: (month: BudgetMonthKey) => void;
+  updateLineItemActual: (itemId: string, monthKey: BudgetMonthKey, actual: number, notes?: string) => void;
+  updateLineItemBudget: (itemId: string, monthKey: BudgetMonthKey, budget: number) => void;
+  bulkUpdateActualsFromExcel: (
+    monthKey: BudgetMonthKey, 
+    parsedRows: Array<{ code?: string; name?: string; actual: number; notes?: string }>
+  ) => { updatedCount: number; notFoundCount: number };
+  resetBudgetData: () => void;
   compliances: ComplianceItem[];
   toggleSubtask: (complianceId: string, subtaskNumber: 1 | 2 | 3, notes?: string, docRef?: string) => void;
   updateCompliance: (item: ComplianceItem) => void;
@@ -56,6 +77,23 @@ interface AppContextType {
   addActionSubtask: (actionId: string, title: string) => void;
   financialMIS: FinancialMIS;
   updateFinancialMIS: (data: Partial<FinancialMIS>) => void;
+  invoices: TrackedInvoice[];
+  addInvoice: (invoice: TrackedInvoice) => void;
+  updateInvoice: (invoice: TrackedInvoice) => void;
+  advanceInvoiceStage: (invoiceId: string, nextStage: InvoiceStage, stageData?: Record<string, any>) => void;
+  deleteInvoice: (invoiceId: string) => void;
+  invoiceStats: {
+    total: number;
+    critical: number;
+    guard: number;
+    grnQc: number;
+    erp: number;
+    accountHead: number;
+    accountsBooking: number;
+    booked: number;
+    totalAmount: number;
+    criticalAmount: number;
+  };
   clientProfile: ClientProfile;
   filterOptions: FilterOptions;
   setFilterOptions: React.Dispatch<React.SetStateAction<FilterOptions>>;
@@ -90,6 +128,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const COMPLIANCES_KEY = 'vcfo_compliances_v1';
 const ACTIONS_KEY = 'vcfo_actions_v1';
 const MIS_KEY = 'vcfo_mis_v1';
+const INVOICES_KEY = 'vcfo_tracked_invoices_v3';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Current user & authentication state
@@ -103,8 +142,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [role, setRoleState] = useState<Role>(currentUser.role);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'compliances' | 'actions' | 'mis'>('dashboard');
+  const [activeTab, setActiveTabState] = useState<'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget'>('dashboard');
   const [companies] = useState<ClientProfile[]>(CLIENT_COMPANIES);
+
+  // Invoices state with SLA recalculation
+  const [invoices, setInvoices] = useState<TrackedInvoice[]>(() => {
+    try {
+      const saved = localStorage.getItem(INVOICES_KEY);
+      if (saved) {
+        const parsed: TrackedInvoice[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_TRACKED_INVOICES;
+  });
+
+  // Persist invoices
+  useEffect(() => {
+    try {
+      localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+    } catch (err) {
+      console.error('Failed saving invoices:', err);
+    }
+  }, [invoices]);
 
   // Selected company ID (strictly enforced for non-CFO roles)
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string>(() => {
@@ -201,6 +261,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return COMPANY_FINANCIAL_MIS;
   });
 
+  // Multi-company Budget & Variance state with local storage
+  const [allBudgetMap, setAllBudgetMap] = useState<Record<string, BudgetLineItem[]>>(() => {
+    try {
+      const saved = localStorage.getItem('vcfo_multi_budget_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      'client-101': INITIAL_NEXORA_BUDGET_ITEMS,
+      'client-102': INITIAL_NEXORA_BUDGET_ITEMS,
+      'client-103': INITIAL_NEXORA_BUDGET_ITEMS
+    };
+  });
+
+  const [selectedBudgetMonth, setSelectedBudgetMonth] = useState<BudgetMonthKey>('sep');
+
   // Persist multi-company states
   useEffect(() => {
     try {
@@ -228,6 +303,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     try {
+      localStorage.setItem('vcfo_multi_budget_v1', JSON.stringify(allBudgetMap));
+    } catch (err) {
+      console.error('Failed saving multi budget:', err);
+    }
+  }, [allBudgetMap]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('vcfo_user_account_v2', JSON.stringify(currentUser));
     } catch (err) {
       console.error('Failed saving user account:', err);
@@ -247,6 +330,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return allMISMap[activeCompanyId] || allMISMap['client-101'] || INITIAL_FINANCIAL_MIS;
   }, [allMISMap, activeCompanyId]);
 
+  const budgetItems = useMemo(() => {
+    return allBudgetMap[activeCompanyId] || allBudgetMap['client-101'] || INITIAL_NEXORA_BUDGET_ITEMS;
+  }, [allBudgetMap, activeCompanyId]);
+
+  const updateLineItemActual = (itemId: string, monthKey: BudgetMonthKey, actual: number, notes?: string) => {
+    setAllBudgetMap(prev => {
+      const currentList = prev[activeCompanyId] || prev['client-101'] || INITIAL_NEXORA_BUDGET_ITEMS;
+      const updated = currentList.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            monthly: {
+              ...item.monthly,
+              [monthKey]: {
+                ...item.monthly[monthKey],
+                actual,
+                ...(notes !== undefined ? { notes } : {})
+              }
+            }
+          };
+        }
+        return item;
+      });
+      return { ...prev, [activeCompanyId]: updated };
+    });
+    showToast(`Updated actual figure for ${monthKey.toUpperCase()}`);
+  };
+
+  const updateLineItemBudget = (itemId: string, monthKey: BudgetMonthKey, budget: number) => {
+    setAllBudgetMap(prev => {
+      const currentList = prev[activeCompanyId] || prev['client-101'] || INITIAL_NEXORA_BUDGET_ITEMS;
+      const updated = currentList.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            monthly: {
+              ...item.monthly,
+              [monthKey]: {
+                ...item.monthly[monthKey],
+                budget
+              }
+            }
+          };
+        }
+        return item;
+      });
+      return { ...prev, [activeCompanyId]: updated };
+    });
+    showToast(`Updated budget figure for ${monthKey.toUpperCase()}`);
+  };
+
+  const bulkUpdateActualsFromExcel = (
+    monthKey: BudgetMonthKey,
+    parsedRows: Array<{ code?: string; name?: string; actual: number; notes?: string }>
+  ) => {
+    let updatedCount = 0;
+
+    setAllBudgetMap(prev => {
+      const currentList = prev[activeCompanyId] || prev['client-101'] || INITIAL_NEXORA_BUDGET_ITEMS;
+      const updated = currentList.map(item => {
+        // Find matching row by exact code or fuzzy name
+        const match = parsedRows.find(r => {
+          if (r.code && r.code.trim().toUpperCase() === item.code.trim().toUpperCase()) {
+            return true;
+          }
+          if (r.name && r.name.trim().toLowerCase() === item.name.trim().toLowerCase()) {
+            return true;
+          }
+          if (r.name && item.name.toLowerCase().includes(r.name.trim().toLowerCase())) {
+            return true;
+          }
+          return false;
+        });
+
+        if (match && typeof match.actual === 'number' && !isNaN(match.actual)) {
+          updatedCount++;
+          return {
+            ...item,
+            monthly: {
+              ...item.monthly,
+              [monthKey]: {
+                ...item.monthly[monthKey],
+                actual: match.actual,
+                notes: match.notes || item.monthly[monthKey]?.notes
+              }
+            }
+          };
+        }
+        return item;
+      });
+
+      return { ...prev, [activeCompanyId]: updated };
+    });
+
+    const notFoundCount = Math.max(0, parsedRows.length - updatedCount);
+    showToast(`Excel uploaded: ${updatedCount} actuals updated for ${monthKey.toUpperCase()}`);
+    return { updatedCount, notFoundCount };
+  };
+
+  const resetBudgetData = () => {
+    setAllBudgetMap(prev => ({
+      ...prev,
+      [activeCompanyId]: INITIAL_NEXORA_BUDGET_ITEMS
+    }));
+    showToast('Reset budget & actual numbers to default financial model');
+  };
+
   const clientProfile = useMemo(() => {
     return companies.find(c => c.id === activeCompanyId) || companies[0];
   }, [companies, activeCompanyId]);
@@ -256,10 +446,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRoleState(newRole);
     const targetUser = DEFAULT_USERS.find(u => u.role === newRole) || DEFAULT_USERS[0];
     setCurrentUser(targetUser);
-    if (newRole !== 'cfo') {
+    if (newRole === 'client_team') {
       setSelectedCompanyIdState('client-101');
       setCfoViewMode('single_company');
+      setActiveTabState('compliances');
+    } else if (newRole === 'client') {
+      setSelectedCompanyIdState('client-101');
+      setCfoViewMode('single_company');
+      setActiveTabState('dashboard');
+    } else {
+      setCfoViewMode('portfolio');
+      setActiveTabState('dashboard');
     }
+  };
+
+  const setActiveTab = (tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => {
+    if (role === 'client_team' && tab !== 'compliances' && tab !== 'actions') {
+      showToast('Client team has operational access only to Compliance Master and Action Items.');
+      setActiveTabState('compliances');
+      return;
+    }
+    setActiveTabState(tab);
   };
 
   const setSelectedCompanyId = (companyId: string) => {
@@ -277,14 +484,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const drillDownToCompany = (companyId: string) => {
     setSelectedCompanyId(companyId);
     setCfoViewMode('single_company');
-    setActiveTab('dashboard');
+    setActiveTabState('dashboard');
     const comp = companies.find(c => c.id === companyId);
     showToast(`Viewing workspace: ${comp?.companyName || 'Company'}`);
   };
 
   const returnToPortfolio = () => {
     setCfoViewMode('portfolio');
-    setActiveTab('dashboard');
+    setActiveTabState('dashboard');
+  };
+
+  const switchCompanyAndTab = (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => {
+    setSelectedCompanyId(companyId);
+    setCfoViewMode('single_company');
+    setActiveTabState(tab);
+    const comp = companies.find(c => c.id === companyId);
+    showToast(`Workspace switched to ${comp?.companyName || 'Company'}: editing ${tab.toUpperCase()}`);
+  };
+
+  const approveCfoComplianceReview = (companyId: string, complianceId: string) => {
+    setAllCompliancesMap(prevMap => {
+      const list = prevMap[companyId] || ALL_COMPANIES_COMPLIANCES[companyId] || [];
+      const updated = list.map(comp => {
+        if (comp.id !== complianceId) return comp;
+        const nowFormatted = new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const updatedSubtasks = comp.subtasks.map(st => {
+          if (st.subtaskNumber === 2) {
+            return {
+              ...st,
+              status: 'completed',
+              completedAt: nowFormatted,
+              completedBy: 'CA Manish Goyal (CFO)'
+            } as SubTask;
+          }
+          return st;
+        }) as [SubTask, SubTask, SubTask];
+
+        return {
+          ...comp,
+          subtasks: updatedSubtasks
+        };
+      });
+      return {
+        ...prevMap,
+        [companyId]: updated
+      };
+    });
+    try {
+      confetti({ particleCount: 35, spread: 60, origin: { y: 0.6 } });
+    } catch {}
+    showToast('CFO Sign-Off Approved: Compliance moved to Portal Filing queue.');
   };
 
   const loginAs = (newRole: Role, targetCompanyId?: string) => {
@@ -294,11 +549,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newRole === 'cfo') {
       setSelectedCompanyIdState(targetCompanyId || 'client-101');
       setCfoViewMode('portfolio');
+      setActiveTabState('dashboard');
+    } else if (newRole === 'client_team') {
+      setSelectedCompanyIdState('client-101');
+      setCfoViewMode('single_company');
+      setActiveTabState('compliances');
     } else {
       setSelectedCompanyIdState('client-101');
       setCfoViewMode('single_company');
+      setActiveTabState('dashboard');
     }
-    setActiveTab('dashboard');
     setIsAuthModalOpen(false);
     showToast(`Signed in as ${user.name} (${user.roleTitle})`);
   };
@@ -312,9 +572,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAllCompliancesMap(ALL_COMPANIES_COMPLIANCES);
     setAllActionsMap(ALL_COMPANIES_ACTIONS);
     setAllMISMap(COMPANY_FINANCIAL_MIS);
+    setInvoices(INITIAL_TRACKED_INVOICES);
     localStorage.removeItem('vcfo_multi_compliances_v2');
     localStorage.removeItem('vcfo_multi_actions_v2');
     localStorage.removeItem('vcfo_multi_mis_v2');
+    localStorage.removeItem(INVOICES_KEY);
     localStorage.removeItem(COMPLIANCES_KEY);
     localStorage.removeItem(ACTIONS_KEY);
     localStorage.removeItem(MIS_KEY);
@@ -395,6 +657,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
   }, [companies, allCompliancesMap, allActionsMap, allMISMap]);
+
+  // Consolidated critical or delayed items across all companies
+  const criticalDelayedItems = useMemo<CriticalDelayedItem[]>(() => {
+    const list: CriticalDelayedItem[] = [];
+    const now = new Date();
+
+    // 1. Statutory compliances across all companies
+    companies.forEach(company => {
+      const compList = allCompliancesMap[company.id] || ALL_COMPANIES_COMPLIANCES[company.id] || [];
+      compList.forEach(comp => {
+        const subtasks = comp?.subtasks || [];
+        const isFiled = subtasks[2]?.status === 'completed';
+        const isCfoReviewPending = subtasks[0]?.status === 'completed' && subtasks[1]?.status === 'pending';
+        
+        // Critical or CFO Review pending
+        if (!isFiled && (comp.criticality === 'Critical' || isCfoReviewPending)) {
+          list.push({
+            id: `crit-comp-${company.id}-${comp.id}`,
+            type: 'compliance',
+            companyId: company.id,
+            companyName: company.companyName,
+            title: `${comp.name} (${comp.category})`,
+            category: comp.category,
+            severity: isCfoReviewPending ? 'Critical' : 'Delayed',
+            deadlineOrAge: `Due: ${comp.statutoryDueDate.split(';')[0]}`,
+            assigneeOrDept: isCfoReviewPending ? 'CFO Review Pending' : (subtasks[0]?.status === 'pending' ? 'Team Collation' : 'Filing Desk'),
+            penaltyOrRisk: comp.penaltyClause || 'Statutory late fees, penalty notice, and interest under relevant Act',
+            financialAmount: comp.taxAmount,
+            stageInfo: isCfoReviewPending ? 'Subtask 2 awaiting CFO Sign-Off' : 'Draft collation in progress',
+            cfoReviewPending: isCfoReviewPending
+          });
+        }
+      });
+    });
+
+    // 2. Action items across all companies
+    companies.forEach(company => {
+      const actList = allActionsMap[company.id] || ALL_COMPANIES_ACTIONS[company.id] || [];
+      actList.forEach(act => {
+        if (act && act.status !== 'Completed') {
+          const d = new Date(act.fixedDeadline);
+          const isOverdue = !isNaN(d.getTime()) && d < now;
+          const isUrgent = act.priority === 'Urgent';
+
+          if (isOverdue || isUrgent) {
+            list.push({
+              id: `crit-act-${company.id}-${act.id}`,
+              type: 'action',
+              companyId: company.id,
+              companyName: company.companyName,
+              title: act.title,
+              category: act.category,
+              severity: isOverdue ? 'Overdue' : 'Critical',
+              deadlineOrAge: `Target: ${act.fixedDeadline.split(' ')[0]}`,
+              assigneeOrDept: `${act.assignedTo} (${act.assignedRole || 'Finance Team'})`,
+              penaltyOrRisk: act.remarks || act.description,
+              stageInfo: `${act.status} • Priority: ${act.priority}`,
+              cfoReviewPending: false
+            });
+          }
+        }
+      });
+    });
+
+    // 3. Delayed Invoices (>2 days SLA breach)
+    (invoices || []).forEach(inv => {
+      if (inv.currentStage !== 'booked' && (inv.slaStatus === 'critical' || inv.dwellTimeHours >= 48)) {
+        list.push({
+          id: `crit-inv-${inv.id}`,
+          type: 'invoice',
+          companyId: 'client-101',
+          companyName: clientProfile.companyName,
+          title: `Invoice #${inv.invoiceNumber} • ${inv.vendorName}`,
+          category: inv.category,
+          severity: 'Critical',
+          deadlineOrAge: `Dwell Time: ${inv.dwellTimeHours}h (>48h SLA)`,
+          assigneeOrDept: inv.currentDepartment,
+          penaltyOrRisk: `Vendor supply disruption risk; stuck at ${inv.currentStageTitle}. Value: ₹${inv.totalAmount.toLocaleString('en-IN')}`,
+          financialAmount: inv.totalAmount,
+          stageInfo: `Stage: ${inv.currentStageTitle}`,
+          cfoReviewPending: inv.currentStage === 'account_head'
+        });
+      }
+    });
+
+    return list;
+  }, [companies, allCompliancesMap, allActionsMap, invoices, clientProfile]);
 
   const toggleSubtask = (
     complianceId: string, 
@@ -722,6 +1071,132 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [compliances, actions]);
 
+  // Invoice Management Operations
+  const addInvoice = (newInvoice: TrackedInvoice) => {
+    setInvoices(prev => [newInvoice, ...prev]);
+    showToast(`Invoice #${newInvoice.invoiceNumber} recorded at Gate Inward and queued for GRN/QC`);
+  };
+
+  const updateInvoice = (updated: TrackedInvoice) => {
+    setInvoices(prev => prev.map(inv => inv.id === updated.id ? updated : inv));
+    showToast(`Invoice #${updated.invoiceNumber} updated`);
+  };
+
+  const deleteInvoice = (invoiceId: string) => {
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    showToast('Invoice entry deleted');
+  };
+
+  const advanceInvoiceStage = (
+    invoiceId: string, 
+    nextStage: InvoiceStage, 
+    stageData?: Record<string, any>
+  ) => {
+    setInvoices(prev => {
+      return prev.map(inv => {
+        if (inv.id !== invoiceId) return inv;
+
+        const nowIso = new Date().toISOString();
+        const stageTitles: Record<InvoiceStage, string> = {
+          guard: 'Gate Receipt (Guard)',
+          grn_qc: 'GRN & Quality Check Dept',
+          erp: 'ERP Person Entry',
+          account_head: 'Account Head Approval',
+          accounts_booking: 'In Accounts for Booking',
+          booked: 'Completed & Booked in Ledger'
+        };
+
+        const newHistoryItem = {
+          id: `hist-${Date.now()}`,
+          stage: nextStage,
+          stageTitle: stageTitles[nextStage] || nextStage,
+          action: stageData?.actionSummary || `Moved to ${stageTitles[nextStage]}`,
+          actorName: currentUser.name,
+          actorRole: currentUser.roleTitle,
+          timestamp: nowIso,
+          daysSpent: inv.daysInCurrentStage,
+          notes: stageData?.notes || stageData?.qcRemarks || stageData?.erpRemarks || stageData?.approvalRemarks || stageData?.bookingRemarks || ''
+        };
+
+        const updated: TrackedInvoice = {
+          ...inv,
+          currentStage: nextStage,
+          stageEnteredAt: nowIso,
+          daysInCurrentStage: 0,
+          slaStatus: 'on_track',
+          isCritical: false,
+          criticalReason: undefined,
+          history: [...inv.history, newHistoryItem]
+        };
+
+        if (stageData?.grnDetails) {
+          updated.grnDetails = { ...(updated.grnDetails || {}), ...stageData.grnDetails };
+        }
+        if (stageData?.erpDetails) {
+          updated.erpDetails = { ...(updated.erpDetails || {}), ...stageData.erpDetails };
+        }
+        if (stageData?.accountHeadDetails) {
+          updated.accountHeadDetails = { ...(updated.accountHeadDetails || {}), ...stageData.accountHeadDetails };
+        }
+        if (stageData?.bookingDetails) {
+          updated.bookingDetails = { ...(updated.bookingDetails || {}), ...stageData.bookingDetails };
+        }
+
+        return updated;
+      });
+    });
+
+    if (nextStage === 'booked') {
+      try {
+        confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
+      } catch {}
+      showToast('🎉 Invoice successfully booked in ledger and payment scheduled!');
+    } else {
+      showToast(`Invoice progressed to ${nextStage.replace('_', ' ').toUpperCase()} successfully`);
+    }
+  };
+
+  // Invoice Statistics with strict 2-day SLA computation
+  const invoiceStats = useMemo(() => {
+    const list = invoices || [];
+    let critical = 0;
+    let guard = 0;
+    let grnQc = 0;
+    let erp = 0;
+    let accountHead = 0;
+    let accountsBooking = 0;
+    let booked = 0;
+    let totalAmount = 0;
+    let criticalAmount = 0;
+
+    list.forEach(inv => {
+      totalAmount += inv.totalAmount || 0;
+      if (inv.isCritical || inv.daysInCurrentStage > 2.0) {
+        critical++;
+        criticalAmount += inv.totalAmount || 0;
+      }
+      if (inv.currentStage === 'guard') guard++;
+      else if (inv.currentStage === 'grn_qc') grnQc++;
+      else if (inv.currentStage === 'erp') erp++;
+      else if (inv.currentStage === 'account_head') accountHead++;
+      else if (inv.currentStage === 'accounts_booking') accountsBooking++;
+      else if (inv.currentStage === 'booked') booked++;
+    });
+
+    return {
+      total: list.length,
+      critical,
+      guard,
+      grnQc,
+      erp,
+      accountHead,
+      accountsBooking,
+      booked,
+      totalAmount,
+      criticalAmount
+    };
+  }, [invoices]);
+
   return (
     <AppContext.Provider
       value={{
@@ -741,6 +1216,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         drillDownToCompany,
         returnToPortfolio,
         allCompaniesOverview,
+        criticalDelayedItems,
+        approveCfoComplianceReview,
+        switchCompanyAndTab,
         activeTab,
         setActiveTab,
         compliances,
@@ -755,6 +1233,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addActionSubtask,
         financialMIS,
         updateFinancialMIS,
+        budgetItems,
+        selectedBudgetMonth,
+        setSelectedBudgetMonth,
+        updateLineItemActual,
+        updateLineItemBudget,
+        bulkUpdateActualsFromExcel,
+        resetBudgetData,
+        invoices,
+        addInvoice,
+        updateInvoice,
+        advanceInvoiceStage,
+        deleteInvoice,
+        invoiceStats,
         clientProfile,
         filterOptions,
         setFilterOptions,

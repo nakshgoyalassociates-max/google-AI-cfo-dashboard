@@ -4,6 +4,17 @@ import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
 import { FinancialMIS } from '../../types';
+import { BalanceSheetView } from './BalanceSheetView';
+import { PnlAccountView } from './PnlAccountView';
+import { DebtorAgeingView } from './DebtorAgeingView';
+import { FundFlowView } from './FundFlowView';
+import { 
+  NEXORA_BALANCE_SHEET, 
+  NEXORA_PNL_STATEMENT, 
+  NEXORA_DEBTOR_AGEING, 
+  NEXORA_FUND_FLOW,
+  COMPANY_MIS_DETAILED 
+} from '../../data/mockMisFinancials';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -26,7 +37,13 @@ import {
   Check,
   X,
   Sparkles,
-  Info
+  Info,
+  Scale,
+  ArrowRightLeft,
+  Users,
+  LayoutDashboard,
+  FileText,
+  Calculator
 } from 'lucide-react';
 
 interface ParsedMetricRow {
@@ -38,10 +55,20 @@ interface ParsedMetricRow {
   unit: string;
 }
 
+type MisSubTab = 'overview' | 'balance-sheet' | 'pnl' | 'debtor-ageing' | 'fund-flow' | 'all';
+
 export const FinancialMisTab: React.FC = () => {
-  const { financialMIS, updateFinancialMIS, role, clientProfile, showToast } = useApp();
+  const { financialMIS, updateFinancialMIS, role, clientProfile, showToast, setActiveTab } = useApp();
+  const [activeSubTab, setActiveSubTab] = useState<MisSubTab>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<FinancialMIS>(financialMIS);
+
+  // Active detailed statement datasets for selected company
+  const detailedCompanyData = COMPANY_MIS_DETAILED[clientProfile.id] || COMPANY_MIS_DETAILED['client-101'];
+  const activeBalanceSheet = financialMIS.balanceSheet || detailedCompanyData.balanceSheet || NEXORA_BALANCE_SHEET;
+  const activePnl = financialMIS.pnlStatement || detailedCompanyData.pnlStatement || NEXORA_PNL_STATEMENT;
+  const activeDebtorAgeing = financialMIS.debtorAgeing || detailedCompanyData.debtorAgeing || NEXORA_DEBTOR_AGEING;
+  const activeFundFlow = financialMIS.fundFlow || detailedCompanyData.fundFlow || NEXORA_FUND_FLOW;
 
   // Excel upload & template manager states
   const [isExcelPanelOpen, setIsExcelPanelOpen] = useState(false);
@@ -845,214 +872,429 @@ export const FinancialMisTab: React.FC = () => {
         </form>
       )}
 
-      {/* Row 1: Executive KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Monthly Revenue"
-          value={`₹${(financialMIS.monthlyRevenue / 100000).toFixed(2)} L`}
-          subtitle={`${financialMIS.period}`}
-          trend={{ value: `${financialMIS.revenueGrowthMoM}% MoM`, isPositive: financialMIS.revenueGrowthMoM > 0 }}
-          icon={IndianRupee}
-          badge={{ text: 'Top-Line', variant: 'info' }}
-          iconBgColor="bg-indigo-50 text-indigo-600 border-indigo-200"
-        />
+      {/* Sub-Navigation Tabs for Detailed Financial Statements */}
+      <div className="flex items-center justify-between border-b border-slate-200 overflow-x-auto gap-2 pt-1 pb-1">
+        <div className="flex items-center gap-1.5 flex-nowrap">
+          <button
+            onClick={() => setActiveSubTab('overview')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'overview'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>Overview & Vitals</span>
+          </button>
 
-        <MetricCard
-          title="Operating EBITDA"
-          value={`₹${(financialMIS.ebitda / 100000).toFixed(2)} L`}
-          subtitle={`Margin: ${financialMIS.ebitdaMarginPercent}%`}
-          trend={{ value: `Net PAT: ₹${(financialMIS.netProfit / 100000).toFixed(1)}L`, isPositive: true }}
-          icon={TrendingUp}
-          badge={{ text: 'Profitability', variant: 'success' }}
-          iconBgColor="bg-emerald-50 text-emerald-600 border-emerald-200"
-        />
-
-        <MetricCard
-          title="Liquid Treasury"
-          value={`₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`}
-          subtitle={`Burn: ₹${(financialMIS.monthlyBurnRate / 100000).toFixed(1)}L/mo`}
-          trend={{ value: `${financialMIS.cashRunwayMonths} Mo. Runway`, isPositive: financialMIS.cashRunwayMonths >= 6 }}
-          icon={Wallet}
-          badge={{ text: 'Runway', variant: 'info' }}
-          iconBgColor="bg-sky-50 text-sky-600 border-sky-200"
-        />
-
-        <MetricCard
-          title="MSME Sec 43B(h) Risk"
-          value={`₹${(financialMIS.creditorsOver45Days / 100000).toFixed(2)} L`}
-          subtitle="Vendor dues > 45 days"
-          trend={{ value: "Tax disallowance risk", isPositive: false }}
-          icon={AlertTriangle}
-          badge={{ text: 'Statutory', variant: 'danger' }}
-          iconBgColor="bg-rose-50 text-rose-600 border-rose-200"
-        />
-      </div>
-
-      {/* Row 2: Working Capital Dynamics & Receivables / Payables Ageing */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Trade Receivables & DSO Radar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-sm font-bold text-slate-900">
-                Trade Receivables & DSO Radar
-              </h2>
-            </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-              DSO: {financialMIS.debtorDaysDSO} Days
+          <button
+            onClick={() => setActiveSubTab('balance-sheet')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'balance-sheet'
+                ? 'bg-indigo-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-indigo-600 hover:bg-indigo-50'
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Broad Balance Sheet</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/30 text-white font-mono">
+              Ind AS
             </span>
-          </div>
+          </button>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Total Receivables:</span>
-              <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
-                ₹{(financialMIS.totalDebtors / 100000).toFixed(2)} Lakhs
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Across 48 customer ledgers</p>
-            </div>
-
-            <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
-              <span className="text-amber-800 font-medium">Overdue &gt; 90 Days:</span>
-              <p className="text-lg font-bold text-amber-900 mt-1 font-mono">
-                ₹{(financialMIS.debtorsOver90Days / 100000).toFixed(2)} Lakhs
-              </p>
-              <p className="text-[11px] text-amber-700 mt-0.5">Assigned to team for follow-up</p>
-            </div>
-          </div>
-
-          {/* Ageing Breakdown Bar */}
-          <div className="space-y-1.5 text-xs">
-            <span className="font-semibold text-slate-600">Receivables Ageing Distribution:</span>
-            <div className="h-3 rounded-full bg-slate-100 flex overflow-hidden border border-slate-200">
-              <div style={{ width: '60%' }} className="bg-emerald-500" title="0-30 Days (60%)" />
-              <div style={{ width: '25%' }} className="bg-sky-500" title="31-60 Days (25%)" />
-              <div style={{ width: '15%' }} className="bg-rose-500" title="90+ Days (15%)" />
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> 0-30 Days (60%)
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" /> 31-60 Days (25%)
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> 90+ Days (15%)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Trade Payables & Section 43B(h) MSME Alert */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-600" />
-              <h2 className="text-sm font-bold text-slate-900">
-                Trade Payables & MSME Sec 43B(h) Radar
-              </h2>
-            </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-              Statutory 45-Day Vigilance
+          <button
+            onClick={() => setActiveSubTab('pnl')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'pnl'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-emerald-600 hover:bg-emerald-50'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>P&L Account</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-white font-mono">
+              PAT: {activePnl.profitability.patMarginPercent}%
             </span>
-          </div>
+          </button>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Total Trade Payables:</span>
-              <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
-                ₹{(financialMIS.totalCreditors / 100000).toFixed(2)} Lakhs
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5">34 vendor accounts</p>
-            </div>
+          <button
+            onClick={() => setActiveSubTab('debtor-ageing')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'debtor-ageing'
+                ? 'bg-indigo-700 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-indigo-700 hover:bg-indigo-50'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Debtor Ageing</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-600/30 text-white font-mono">
+              DSO: {activeDebtorAgeing.daysSalesOutstanding}d
+            </span>
+          </button>
 
-            <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-200">
-              <span className="text-rose-800 font-medium">MSME &gt; 45 Days Risk:</span>
-              <p className="text-lg font-bold text-rose-900 mt-1 font-mono">
-                ₹{(financialMIS.creditorsOver45Days / 100000).toFixed(2)} Lakhs
-              </p>
-              <p className="text-[11px] text-rose-700 mt-0.5">Subject to income tax disallowance</p>
-            </div>
-          </div>
+          <button
+            onClick={() => setActiveSubTab('fund-flow')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'fund-flow'
+                ? 'bg-sky-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-sky-600 hover:bg-sky-50'
+            }`}
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>Fund Flow</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-sky-500/30 text-white font-mono">
+              Working Capital
+            </span>
+          </button>
 
-          <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
-            <div className="flex items-center gap-1.5 font-bold">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>Section 43B(h) Income Tax Compliance Note:</span>
-            </div>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              Any payment to registered MSME suppliers pending beyond 45 days (or 15 days without agreement) cannot be claimed as tax deduction until actual payment is made. An action item is currently assigned to Pooja Sharma to clear ₹2.80L before month-end.
-            </p>
-          </div>
-        </div>
+          <button
+            onClick={() => setActiveSubTab('all')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'all'
+                ? 'bg-slate-800 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Consolidated Financial Dossier</span>
+          </button>
 
-      </div>
-
-      {/* Row 3: Profit & Loss Statement Snapshot */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              Executive Profit & Loss Statement
-            </h2>
-            <p className="text-xs text-slate-500">
-              Prepared under Ind AS & Indian GAAP by {clientProfile.cfoFirm}
-            </p>
-          </div>
-          <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
-            Audit-Ready Books
-          </span>
-        </div>
-
-        <div className="divide-y divide-slate-100 text-xs">
-          <div className="py-2.5 flex items-center justify-between font-bold text-slate-900">
-            <span>Gross Revenue from Operations</span>
-            <span className="font-mono text-sm">₹{financialMIS.monthlyRevenue.toLocaleString('en-IN')}</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between text-slate-600">
-            <span className="pl-4">Less: Direct Costs & Cost of Goods Sold (COGS)</span>
-            <span className="font-mono text-rose-600">-₹{(financialMIS.monthlyRevenue * (1 - financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between font-bold text-indigo-900 bg-indigo-50/40 px-2 rounded">
-            <span>Gross Profit ({financialMIS.grossMarginPercent}%)</span>
-            <span className="font-mono">₹{(financialMIS.monthlyRevenue * (financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between text-slate-600">
-            <span className="pl-4">Less: Employee Expenses & Payroll</span>
-            <span className="font-mono text-rose-600">-₹12,40,000</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between text-slate-600">
-            <span className="pl-4">Less: Sales, Marketing & Administrative Opex</span>
-            <span className="font-mono text-rose-600">-₹9,27,000</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between font-bold text-slate-900 bg-slate-50 px-2 rounded">
-            <span>EBITDA ({financialMIS.ebitdaMarginPercent}%)</span>
-            <span className="font-mono text-sm">₹{financialMIS.ebitda.toLocaleString('en-IN')}</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between text-slate-600">
-            <span className="pl-4">Less: Depreciation, Amortization & Finance Costs</span>
-            <span className="font-mono text-slate-700">-₹75,000</span>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between text-slate-600">
-            <span className="pl-4">Less: Current Tax Provision & Advance Tax</span>
-            <span className="font-mono text-slate-700">-₹2,00,000</span>
-          </div>
-
-          <div className="py-3 flex items-center justify-between font-extrabold text-emerald-900 bg-emerald-50 px-3 rounded-lg text-sm border border-emerald-200">
-            <span>Net Profit After Tax (PAT)</span>
-            <span className="font-mono">₹{financialMIS.netProfit.toLocaleString('en-IN')}</span>
-          </div>
+          <button
+            onClick={() => setActiveTab('budget')}
+            className="px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 ml-auto shadow-2xs"
+            title="Open comprehensive month-wise Budget & Variance module"
+          >
+            <Calculator className="w-3.5 h-3.5 text-amber-700" />
+            <span>Open Budget & Variance Tab</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 font-bold">
+              ±5% Alerts
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* SUB-VIEW 1: OVERVIEW & VITALS */}
+      {activeSubTab === 'overview' && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          {/* Row 1: Executive KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title="Monthly Revenue"
+              value={`₹${(financialMIS.monthlyRevenue / 100000).toFixed(2)} L`}
+              subtitle={`${financialMIS.period}`}
+              trend={{ value: `${financialMIS.revenueGrowthMoM}% MoM`, isPositive: financialMIS.revenueGrowthMoM > 0 }}
+              icon={IndianRupee}
+              badge={{ text: 'Top-Line', variant: 'info' }}
+              iconBgColor="bg-indigo-50 text-indigo-600 border-indigo-200"
+            />
+
+            <MetricCard
+              title="Operating EBITDA"
+              value={`₹${(financialMIS.ebitda / 100000).toFixed(2)} L`}
+              subtitle={`Margin: ${financialMIS.ebitdaMarginPercent}%`}
+              trend={{ value: `Net PAT: ₹${(financialMIS.netProfit / 100000).toFixed(1)}L`, isPositive: true }}
+              icon={TrendingUp}
+              badge={{ text: 'Profitability', variant: 'success' }}
+              iconBgColor="bg-emerald-50 text-emerald-600 border-emerald-200"
+            />
+
+            <MetricCard
+              title="Liquid Treasury"
+              value={`₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`}
+              subtitle={`Burn: ₹${(financialMIS.monthlyBurnRate / 100000).toFixed(1)}L/mo`}
+              trend={{ value: `${financialMIS.cashRunwayMonths} Mo. Runway`, isPositive: financialMIS.cashRunwayMonths >= 6 }}
+              icon={Wallet}
+              badge={{ text: 'Runway', variant: 'info' }}
+              iconBgColor="bg-sky-50 text-sky-600 border-sky-200"
+            />
+
+            <MetricCard
+              title="MSME Sec 43B(h) Risk"
+              value={`₹${(financialMIS.creditorsOver45Days / 100000).toFixed(2)} L`}
+              subtitle="Vendor dues > 45 days"
+              trend={{ value: "Tax disallowance risk", isPositive: false }}
+              icon={AlertTriangle}
+              badge={{ text: 'Statutory', variant: 'danger' }}
+              iconBgColor="bg-rose-50 text-rose-600 border-rose-200"
+            />
+          </div>
+
+          {/* Row 2: Working Capital Dynamics & Receivables / Payables Ageing */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Trade Receivables & DSO Radar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Building className="w-4 h-4 text-indigo-600" />
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Trade Receivables & DSO Radar
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setActiveSubTab('debtor-ageing')}
+                  className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>DSO: {financialMIS.debtorDaysDSO} Days</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-slate-500 font-medium">Total Receivables:</span>
+                  <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
+                    ₹{(financialMIS.totalDebtors / 100000).toFixed(2)} Lakhs
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Across 48 customer ledgers</p>
+                </div>
+
+                <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                  <span className="text-amber-800 font-medium">Overdue &gt; 90 Days:</span>
+                  <p className="text-lg font-bold text-amber-900 mt-1 font-mono">
+                    ₹{(financialMIS.debtorsOver90Days / 100000).toFixed(2)} Lakhs
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">Assigned to team for follow-up</p>
+                </div>
+              </div>
+
+              {/* Ageing Breakdown Bar */}
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between font-semibold text-slate-600">
+                  <span>Receivables Ageing Distribution:</span>
+                  <button 
+                    onClick={() => setActiveSubTab('debtor-ageing')} 
+                    className="text-indigo-600 text-[11px] hover:underline cursor-pointer"
+                  >
+                    View Ledger Breakdown →
+                  </button>
+                </div>
+                <div className="h-3 rounded-full bg-slate-100 flex overflow-hidden border border-slate-200">
+                  <div style={{ width: '60%' }} className="bg-emerald-500" title="0-30 Days (60%)" />
+                  <div style={{ width: '25%' }} className="bg-sky-500" title="31-60 Days (25%)" />
+                  <div style={{ width: '15%' }} className="bg-rose-500" title="90+ Days (15%)" />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> 0-30 Days (60%)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" /> 31-60 Days (25%)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> 90+ Days (15%)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Trade Payables & Section 43B(h) MSME Alert */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Trade Payables & MSME Sec 43B(h) Radar
+                  </h2>
+                </div>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                  Statutory 45-Day Vigilance
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-slate-500 font-medium">Total Trade Payables:</span>
+                  <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
+                    ₹{(financialMIS.totalCreditors / 100000).toFixed(2)} Lakhs
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">34 vendor accounts</p>
+                </div>
+
+                <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-200">
+                  <span className="text-rose-800 font-medium">MSME &gt; 45 Days Risk:</span>
+                  <p className="text-lg font-bold text-rose-900 mt-1 font-mono">
+                    ₹{(financialMIS.creditorsOver45Days / 100000).toFixed(2)} Lakhs
+                  </p>
+                  <p className="text-[11px] text-rose-700 mt-0.5">Subject to income tax disallowance</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span>Section 43B(h) Income Tax Compliance Note:</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Any payment to registered MSME suppliers pending beyond 45 days (or 15 days without agreement) cannot be claimed as tax deduction until actual payment is made. An action item is currently assigned to Pooja Sharma to clear ₹2.80L before month-end.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Quick P&L Statement Snapshot */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Executive Profit & Loss Statement Snapshot
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Prepared under Ind AS & Indian GAAP by {clientProfile.cfoFirm}
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveSubTab('pnl')}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer flex items-center gap-1"
+              >
+                <span>Full P&L Account</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 text-xs">
+              <div className="py-2.5 flex items-center justify-between font-bold text-slate-900">
+                <span>Gross Revenue from Operations</span>
+                <span className="font-mono text-sm">₹{financialMIS.monthlyRevenue.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between text-slate-600">
+                <span className="pl-4">Less: Direct Costs & Cost of Goods Sold (COGS)</span>
+                <span className="font-mono text-rose-600">-₹{(financialMIS.monthlyRevenue * (1 - financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between font-bold text-indigo-900 bg-indigo-50/40 px-2 rounded">
+                <span>Gross Profit ({financialMIS.grossMarginPercent}%)</span>
+                <span className="font-mono">₹{(financialMIS.monthlyRevenue * (financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between text-slate-600">
+                <span className="pl-4">Less: Employee Expenses & Payroll</span>
+                <span className="font-mono text-rose-600">-₹12,40,000</span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between text-slate-600">
+                <span className="pl-4">Less: Sales, Marketing & Administrative Opex</span>
+                <span className="font-mono text-rose-600">-₹9,27,000</span>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between font-bold text-slate-900 bg-slate-50 px-2 rounded">
+                <span>EBITDA ({financialMIS.ebitdaMarginPercent}%)</span>
+                <span className="font-mono text-sm">₹{financialMIS.ebitda.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="py-3 flex items-center justify-between font-extrabold text-emerald-900 bg-emerald-50 px-3 rounded-lg text-sm border border-emerald-200">
+                <span>Net Profit After Tax (PAT)</span>
+                <span className="font-mono">₹{financialMIS.netProfit.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-VIEW 2: BROAD BALANCE SHEET */}
+      {activeSubTab === 'balance-sheet' && (
+        <BalanceSheetView
+          balanceSheet={activeBalanceSheet}
+          clientProfile={clientProfile}
+        />
+      )}
+
+      {/* SUB-VIEW 3: PROFIT & LOSS ACCOUNT */}
+      {activeSubTab === 'pnl' && (
+        <PnlAccountView
+          pnlStatement={activePnl}
+          clientProfile={clientProfile}
+        />
+      )}
+
+      {/* SUB-VIEW 4: DEBTOR AGEING */}
+      {activeSubTab === 'debtor-ageing' && (
+        <DebtorAgeingView
+          debtorAgeing={activeDebtorAgeing}
+          clientProfile={clientProfile}
+        />
+      )}
+
+      {/* SUB-VIEW 5: FUND FLOW STATEMENT */}
+      {activeSubTab === 'fund-flow' && (
+        <FundFlowView
+          fundFlow={activeFundFlow}
+          clientProfile={clientProfile}
+        />
+      )}
+
+      {/* SUB-VIEW 6: CONSOLIDATED ALL STATEMENTS */}
+      {activeSubTab === 'all' && (
+        <div className="space-y-10 animate-in fade-in duration-200">
+          <div className="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold flex items-center gap-2">
+                <span>Comprehensive Financial MIS Dossier</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                  Full 4-Statement Package
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {clientProfile.companyName} • Balance Sheet, P&L Account, Debtor Ageing & Fund Flow
+              </p>
+            </div>
+            <button
+              onClick={() => window.print()}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 cursor-pointer transition-colors shadow-xs"
+            >
+              Print / Save as PDF
+            </button>
+          </div>
+
+          <div className="space-y-8">
+            <section>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                <span>Section I: Broad Balance Sheet</span>
+              </h3>
+              <BalanceSheetView
+                balanceSheet={activeBalanceSheet}
+                clientProfile={clientProfile}
+              />
+            </section>
+
+            <section className="pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>Section II: Executive Profit & Loss Account (P&L)</span>
+              </h3>
+              <PnlAccountView
+                pnlStatement={activePnl}
+                clientProfile={clientProfile}
+              />
+            </section>
+
+            <section className="pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-700"></span>
+                <span>Section III: Debtor Ageing & Receivables Schedule</span>
+              </h3>
+              <DebtorAgeingView
+                debtorAgeing={activeDebtorAgeing}
+                clientProfile={clientProfile}
+              />
+            </section>
+
+            <section className="pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+                <span>Section IV: Fund Flow Statement & Working Capital Analysis</span>
+              </h3>
+              <FundFlowView
+                fundFlow={activeFundFlow}
+                clientProfile={clientProfile}
+              />
+            </section>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,11 @@
 import { ActionItem, ClientProfile, FinancialMIS, UserAccount } from '../types';
+import { 
+  NEXORA_BALANCE_SHEET, 
+  NEXORA_PNL_STATEMENT, 
+  NEXORA_DEBTOR_AGEING, 
+  NEXORA_FUND_FLOW,
+  COMPANY_MIS_DETAILED 
+} from './mockMisFinancials';
 
 export const CLIENT_COMPANIES: ClientProfile[] = [
   {
@@ -97,7 +104,11 @@ export const INITIAL_FINANCIAL_MIS: FinancialMIS = {
     'MSME 45-day threshold: 2 vendor balances totaling ₹2.80L are due in 4 days.',
     'GSTR-3B tax payment of ₹3.84L due on 20th Sep is pre-approved and queued.',
     'Form 3CD Tax Audit schedules final review scheduled with CA Singhal & Co on 20th Sep.'
-  ]
+  ],
+  balanceSheet: NEXORA_BALANCE_SHEET,
+  pnlStatement: NEXORA_PNL_STATEMENT,
+  debtorAgeing: NEXORA_DEBTOR_AGEING,
+  fundFlow: NEXORA_FUND_FLOW
 };
 
 export const COMPANY_FINANCIAL_MIS: Record<string, FinancialMIS> = {
@@ -125,7 +136,11 @@ export const COMPANY_FINANCIAL_MIS: Record<string, FinancialMIS> = {
       'TDS payment under Sec 194C (Transporters) of ₹1.85L cleared on 7th Sep.',
       'Quarterly stock and receivables statement submission due for Axis Bank CC review.',
       'Vehicle tax and interstate permit renewals scheduled for 18 fleet units.'
-    ]
+    ],
+    balanceSheet: COMPANY_MIS_DETAILED['client-102'].balanceSheet,
+    pnlStatement: COMPANY_MIS_DETAILED['client-102'].pnlStatement,
+    debtorAgeing: COMPANY_MIS_DETAILED['client-102'].debtorAgeing,
+    fundFlow: COMPANY_MIS_DETAILED['client-102'].fundFlow
   },
   'client-103': {
     period: 'August 2026 (Month-End MIS)',
@@ -150,7 +165,11 @@ export const COMPANY_FINANCIAL_MIS: Record<string, FinancialMIS> = {
       'Form 8 (Statement of Account & Solvency) documentation drafting in progress.',
       'Advance tax 2nd installment of ₹8.5L paid on 15th Sep.',
       'R&D tax incentive certificate application under Section 35(2AB) in preparation.'
-    ]
+    ],
+    balanceSheet: COMPANY_MIS_DETAILED['client-103'].balanceSheet,
+    pnlStatement: COMPANY_MIS_DETAILED['client-103'].pnlStatement,
+    debtorAgeing: COMPANY_MIS_DETAILED['client-103'].debtorAgeing,
+    fundFlow: COMPANY_MIS_DETAILED['client-103'].fundFlow
   }
 };
 
