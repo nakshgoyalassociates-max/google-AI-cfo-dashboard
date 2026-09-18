@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FundFlowData, ClientProfile } from '../../types';
+import { formatINR } from '../../utils/format';
 import { 
   ArrowRightLeft, 
   CheckCircle2, 
@@ -23,13 +24,7 @@ export const FundFlowView: React.FC<FundFlowViewProps> = ({ fundFlow, clientProf
   const [showInLakhs, setShowInLakhs] = useState(true);
 
   const formatAmount = (amt: number): string => {
-    if (showInLakhs) {
-      if (Math.abs(amt) >= 10000000) {
-        return `₹${(amt / 10000000).toFixed(2)} Cr`;
-      }
-      return `₹${(amt / 100000).toFixed(2)} L`;
-    }
-    return `₹${amt.toLocaleString('en-IN')}`;
+    return formatINR(amt, showInLakhs);
   };
 
   const { sources, applications, workingCapitalSchedule: wcs } = fundFlow;

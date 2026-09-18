@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
-import { TrackedInvoice } from '../../types';
+import { useInvoiceApp } from '../context/InvoiceContext';
+import { TrackedInvoice } from '../types';
 import { 
   Camera, 
   Upload, 
@@ -90,7 +90,7 @@ const PRESET_SAMPLE_INVOICES = [
 ];
 
 export const GuardInvoiceScannerModal: React.FC<GuardInvoiceScannerModalProps> = ({ isOpen, onClose }) => {
-  const { addInvoice, currentUser, clientProfile } = useApp();
+  const { addInvoice, currentUser } = useInvoiceApp();
 
   // Mode: 'camera' | 'upload' | 'preset'
   const [captureMode, setCaptureMode] = useState<'camera' | 'upload' | 'preset'>('preset');
@@ -276,8 +276,8 @@ export const GuardInvoiceScannerModal: React.FC<GuardInvoiceScannerModalProps> =
 
     const newInvoice: TrackedInvoice = {
       id: invoiceId,
-      companyId: clientProfile.id,
-      companyName: clientProfile.companyName,
+      companyId: 'comp-101',
+      companyName: 'NovaTech Industries Pvt Ltd',
       gateEntryNo: gateEntryNo || `GE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       vendorName: vendorName || 'Unspecified Vendor',
       invoiceNumber: invoiceNumber || `INV-${Date.now()}`,

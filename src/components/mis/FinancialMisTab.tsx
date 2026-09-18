@@ -1,13 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
-import { FinancialMIS } from '../../types';
+import { formatINR, formatLakhs, formatCrores } from '../../utils/format';
+import { FinancialMIS, MisSubTab } from '../../types';
 import { BalanceSheetView } from './BalanceSheetView';
 import { PnlAccountView } from './PnlAccountView';
 import { DebtorAgeingView } from './DebtorAgeingView';
 import { FundFlowView } from './FundFlowView';
+import { BudgetTab } from './BudgetTab';
+import { MisVisualBroadPicture } from './MisVisualBroadPicture';
 import { 
   NEXORA_BALANCE_SHEET, 
   NEXORA_PNL_STATEMENT, 
@@ -43,7 +46,8 @@ import {
   Users,
   LayoutDashboard,
   FileText,
-  Calculator
+  Calculator,
+  PieChart
 } from 'lucide-react';
 
 interface ParsedMetricRow {
@@ -55,13 +59,36 @@ interface ParsedMetricRow {
   unit: string;
 }
 
-type MisSubTab = 'overview' | 'balance-sheet' | 'pnl' | 'debtor-ageing' | 'fund-flow' | 'all';
-
 export const FinancialMisTab: React.FC = () => {
-  const { financialMIS, updateFinancialMIS, role, clientProfile, showToast, setActiveTab } = useApp();
-  const [activeSubTab, setActiveSubTab] = useState<MisSubTab>('overview');
+  const { 
+    financialMIS, 
+    updateFinancialMIS, 
+    role, 
+    clientProfile, 
+    showToast, 
+    misSubTab, 
+    setMisSubTab,
+    budgetItems,
+    selectedBudgetMonth 
+  } = useApp();
+  
+  const activeSubTab = misSubTab;
+  const setActiveSubTab = setMisSubTab;
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<FinancialMIS>(financialMIS);
+
+  // Compute how many budget lines breach ±5% variance threshold in active month
+  const budgetAlertCount = useMemo(() => {
+    return budgetItems.filter(item => {
+      const data = item.monthly[selectedBudgetMonth] || { budget: 0, actual: 0 };
+      if (data.budget === 0 && data.actual === 0) return false;
+      const bgt = data.budget;
+      const act = data.actual;
+      const diff = act - bgt;
+      const pct = bgt !== 0 ? (diff / bgt) * 100 : 0;
+      return Math.abs(pct) > 5;
+    }).length;
+  }, [budgetItems, selectedBudgetMonth]);
 
   // Active detailed statement datasets for selected company
   const detailedCompanyData = COMPANY_MIS_DETAILED[clientProfile.id] || COMPANY_MIS_DETAILED['client-101'];
@@ -339,32 +366,32 @@ export const FinancialMisTab: React.FC = () => {
         {
           code: 'REVENUE',
           name: 'Monthly Revenue',
-          currentValue: `₹${(financialMIS.monthlyRevenue / 100000).toFixed(2)} L`,
-          newValue: `₹${((partialMIS.monthlyRevenue ?? financialMIS.monthlyRevenue) / 100000).toFixed(2)} L`,
+          currentValue: formatLakhs(financialMIS.monthlyRevenue),
+          newValue: formatLakhs(partialMIS.monthlyRevenue ?? financialMIS.monthlyRevenue),
           isChanged: partialMIS.monthlyRevenue !== undefined && partialMIS.monthlyRevenue !== financialMIS.monthlyRevenue,
           unit: 'INR'
         },
         {
           code: 'EBITDA',
           name: 'Operating EBITDA',
-          currentValue: `₹${(financialMIS.ebitda / 100000).toFixed(2)} L`,
-          newValue: `₹${((partialMIS.ebitda ?? financialMIS.ebitda) / 100000).toFixed(2)} L`,
+          currentValue: formatLakhs(financialMIS.ebitda),
+          newValue: formatLakhs(partialMIS.ebitda ?? financialMIS.ebitda),
           isChanged: partialMIS.ebitda !== undefined && partialMIS.ebitda !== financialMIS.ebitda,
           unit: 'INR'
         },
         {
           code: 'NET_PROFIT',
           name: 'Net Profit PAT',
-          currentValue: `₹${(financialMIS.netProfit / 100000).toFixed(2)} L`,
-          newValue: `₹${((partialMIS.netProfit ?? financialMIS.netProfit) / 100000).toFixed(2)} L`,
+          currentValue: formatLakhs(financialMIS.netProfit),
+          newValue: formatLakhs(partialMIS.netProfit ?? financialMIS.netProfit),
           isChanged: partialMIS.netProfit !== undefined && partialMIS.netProfit !== financialMIS.netProfit,
           unit: 'INR'
         },
         {
           code: 'CASH_BANK_BALANCE',
           name: 'Cash & Bank Liquid Treasury',
-          currentValue: `₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`,
-          newValue: `₹${((partialMIS.cashAndBankBalance ?? financialMIS.cashAndBankBalance) / 10000000).toFixed(2)} Cr`,
+          currentValue: formatCrores(financialMIS.cashAndBankBalance),
+          newValue: formatCrores(partialMIS.cashAndBankBalance ?? financialMIS.cashAndBankBalance),
           isChanged: partialMIS.cashAndBankBalance !== undefined && partialMIS.cashAndBankBalance !== financialMIS.cashAndBankBalance,
           unit: 'INR'
         },
@@ -379,16 +406,16 @@ export const FinancialMisTab: React.FC = () => {
         {
           code: 'TOTAL_DEBTORS',
           name: 'Total Debtors',
-          currentValue: `₹${(financialMIS.totalDebtors / 100000).toFixed(2)} L`,
-          newValue: `₹${((partialMIS.totalDebtors ?? financialMIS.totalDebtors) / 100000).toFixed(2)} L`,
+          currentValue: formatLakhs(financialMIS.totalDebtors),
+          newValue: formatLakhs(partialMIS.totalDebtors ?? financialMIS.totalDebtors),
           isChanged: partialMIS.totalDebtors !== undefined && partialMIS.totalDebtors !== financialMIS.totalDebtors,
           unit: 'INR'
         },
         {
           code: 'CREDITORS_MSME_OVER_45',
           name: 'MSME > 45 Days (Sec 43B(h))',
-          currentValue: `₹${(financialMIS.creditorsOver45Days / 100000).toFixed(2)} L`,
-          newValue: `₹${((partialMIS.creditorsOver45Days ?? financialMIS.creditorsOver45Days) / 100000).toFixed(2)} L`,
+          currentValue: formatLakhs(financialMIS.creditorsOver45Days),
+          newValue: formatLakhs(partialMIS.creditorsOver45Days ?? financialMIS.creditorsOver45Days),
           isChanged: partialMIS.creditorsOver45Days !== undefined && partialMIS.creditorsOver45Days !== financialMIS.creditorsOver45Days,
           unit: 'INR'
         }
@@ -883,8 +910,15 @@ export const FinancialMisTab: React.FC = () => {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Overview & Vitals</span>
+            <PieChart className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Broad Picture & Vitals</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+              activeSubTab === 'overview'
+                ? 'bg-indigo-500/40 text-indigo-100'
+                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+            }`}>
+              Pie Charts
+            </span>
           </button>
 
           <button
@@ -948,6 +982,26 @@ export const FinancialMisTab: React.FC = () => {
           </button>
 
           <button
+            id="mis-subtab-budget"
+            onClick={() => setActiveSubTab('budget')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'budget'
+                ? 'bg-amber-600 text-white shadow-2xs'
+                : 'text-slate-700 hover:text-amber-800 hover:bg-amber-50'
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            <span>Budget & Variance</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold font-mono ${
+              activeSubTab === 'budget' 
+                ? 'bg-amber-500/30 text-white' 
+                : 'bg-amber-100 text-amber-800 border border-amber-300'
+            }`}>
+              {budgetAlertCount > 0 ? `${budgetAlertCount} Alerts (±5%)` : '±5% Alerts'}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('all')}
             className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
               activeSubTab === 'all'
@@ -957,18 +1011,6 @@ export const FinancialMisTab: React.FC = () => {
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Consolidated Financial Dossier</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('budget')}
-            className="px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 ml-auto shadow-2xs"
-            title="Open comprehensive month-wise Budget & Variance module"
-          >
-            <Calculator className="w-3.5 h-3.5 text-amber-700" />
-            <span>Open Budget & Variance Tab</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 font-bold">
-              ±5% Alerts
-            </span>
           </button>
         </div>
       </div>
@@ -980,7 +1022,7 @@ export const FinancialMisTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
               title="Monthly Revenue"
-              value={`₹${(financialMIS.monthlyRevenue / 100000).toFixed(2)} L`}
+              value={formatLakhs(financialMIS.monthlyRevenue)}
               subtitle={`${financialMIS.period}`}
               trend={{ value: `${financialMIS.revenueGrowthMoM}% MoM`, isPositive: financialMIS.revenueGrowthMoM > 0 }}
               icon={IndianRupee}
@@ -990,9 +1032,9 @@ export const FinancialMisTab: React.FC = () => {
 
             <MetricCard
               title="Operating EBITDA"
-              value={`₹${(financialMIS.ebitda / 100000).toFixed(2)} L`}
+              value={formatLakhs(financialMIS.ebitda)}
               subtitle={`Margin: ${financialMIS.ebitdaMarginPercent}%`}
-              trend={{ value: `Net PAT: ₹${(financialMIS.netProfit / 100000).toFixed(1)}L`, isPositive: true }}
+              trend={{ value: `Net PAT: ${formatLakhs(financialMIS.netProfit, 1)}`, isPositive: true }}
               icon={TrendingUp}
               badge={{ text: 'Profitability', variant: 'success' }}
               iconBgColor="bg-emerald-50 text-emerald-600 border-emerald-200"
@@ -1000,8 +1042,8 @@ export const FinancialMisTab: React.FC = () => {
 
             <MetricCard
               title="Liquid Treasury"
-              value={`₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`}
-              subtitle={`Burn: ₹${(financialMIS.monthlyBurnRate / 100000).toFixed(1)}L/mo`}
+              value={formatCrores(financialMIS.cashAndBankBalance)}
+              subtitle={`Burn: ${formatLakhs(financialMIS.monthlyBurnRate, 1)}/mo`}
               trend={{ value: `${financialMIS.cashRunwayMonths} Mo. Runway`, isPositive: financialMIS.cashRunwayMonths >= 6 }}
               icon={Wallet}
               badge={{ text: 'Runway', variant: 'info' }}
@@ -1010,7 +1052,7 @@ export const FinancialMisTab: React.FC = () => {
 
             <MetricCard
               title="MSME Sec 43B(h) Risk"
-              value={`₹${(financialMIS.creditorsOver45Days / 100000).toFixed(2)} L`}
+              value={formatLakhs(financialMIS.creditorsOver45Days)}
               subtitle="Vendor dues > 45 days"
               trend={{ value: "Tax disallowance risk", isPositive: false }}
               icon={AlertTriangle}
@@ -1019,7 +1061,16 @@ export const FinancialMisTab: React.FC = () => {
             />
           </div>
 
-          {/* Row 2: Working Capital Dynamics & Receivables / Payables Ageing */}
+          {/* Row 2: Broad Picture in Pie Chart (Reveals Complete MIS Quickly) */}
+          <MisVisualBroadPicture
+            pnl={activePnl}
+            balanceSheet={activeBalanceSheet}
+            debtorAgeing={activeDebtorAgeing}
+            financialMIS={financialMIS}
+            onNavigateSubTab={(subTab) => setActiveSubTab(subTab)}
+          />
+
+          {/* Row 3: Working Capital Dynamics & Receivables / Payables Ageing */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {/* Trade Receivables & DSO Radar */}
@@ -1044,7 +1095,7 @@ export const FinancialMisTab: React.FC = () => {
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-500 font-medium">Total Receivables:</span>
                   <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
-                    ₹{(financialMIS.totalDebtors / 100000).toFixed(2)} Lakhs
+                    {formatLakhs(financialMIS.totalDebtors)}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">Across 48 customer ledgers</p>
                 </div>
@@ -1052,7 +1103,7 @@ export const FinancialMisTab: React.FC = () => {
                 <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
                   <span className="text-amber-800 font-medium">Overdue &gt; 90 Days:</span>
                   <p className="text-lg font-bold text-amber-900 mt-1 font-mono">
-                    ₹{(financialMIS.debtorsOver90Days / 100000).toFixed(2)} Lakhs
+                    {formatLakhs(financialMIS.debtorsOver90Days)}
                   </p>
                   <p className="text-[11px] text-amber-700 mt-0.5">Assigned to team for follow-up</p>
                 </div>
@@ -1106,7 +1157,7 @@ export const FinancialMisTab: React.FC = () => {
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-500 font-medium">Total Trade Payables:</span>
                   <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
-                    ₹{(financialMIS.totalCreditors / 100000).toFixed(2)} Lakhs
+                    {formatLakhs(financialMIS.totalCreditors)}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">34 vendor accounts</p>
                 </div>
@@ -1114,7 +1165,7 @@ export const FinancialMisTab: React.FC = () => {
                 <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-200">
                   <span className="text-rose-800 font-medium">MSME &gt; 45 Days Risk:</span>
                   <p className="text-lg font-bold text-rose-900 mt-1 font-mono">
-                    ₹{(financialMIS.creditorsOver45Days / 100000).toFixed(2)} Lakhs
+                    {formatLakhs(financialMIS.creditorsOver45Days)}
                   </p>
                   <p className="text-[11px] text-rose-700 mt-0.5">Subject to income tax disallowance</p>
                 </div>
@@ -1133,60 +1184,70 @@ export const FinancialMisTab: React.FC = () => {
 
           </div>
 
-          {/* Quick P&L Statement Snapshot */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Executive Profit & Loss Statement Snapshot
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Prepared under Ind AS & Indian GAAP by {clientProfile.cfoFirm}
-                </p>
+          {/* Executive Broad Picture MIS Visualizer in Pie Charts */}
+          <MisVisualBroadPicture
+            pnl={activePnl}
+            balanceSheet={activeBalanceSheet}
+            debtorAgeing={activeDebtorAgeing}
+            financialMIS={financialMIS}
+            onNavigateSubTab={(sub) => setActiveSubTab(sub)}
+          />
+
+          {/* Quick FP&A Budget & Variance Highlight Card */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white rounded-2xl border border-amber-200/80 p-6 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900">
+                      FP&A: Month-wise Budget & Variance Pulse
+                    </h2>
+                    <span className="text-[10px] uppercase font-mono font-bold bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full">
+                      {selectedBudgetMonth.toUpperCase()} Fiscal Analysis
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Comprehensive line-item tracking across Sales, Direct Costs, Factory Overheads & Opex with ±5% tolerance threshold.
+                  </p>
+                </div>
               </div>
+
               <button
-                onClick={() => setActiveSubTab('pnl')}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer flex items-center gap-1"
+                onClick={() => setActiveSubTab('budget')}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors whitespace-nowrap self-start sm:self-auto"
               >
-                <span>Full P&L Account</span>
-                <ArrowUpRight className="w-3 h-3" />
+                <span>Full Variance Analysis Sheet</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="divide-y divide-slate-100 text-xs">
-              <div className="py-2.5 flex items-center justify-between font-bold text-slate-900">
-                <span>Gross Revenue from Operations</span>
-                <span className="font-mono text-sm">₹{financialMIS.monthlyRevenue.toLocaleString('en-IN')}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-white/80 p-3.5 rounded-xl border border-amber-100 shadow-2xs">
+                <span className="text-slate-500 font-medium">Budgeted Line Items:</span>
+                <p className="text-lg font-bold text-slate-900 mt-1 font-mono">
+                  {budgetItems.length} Master Codes
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">5 cost heads mapped to P&L</p>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between text-slate-600">
-                <span className="pl-4">Less: Direct Costs & Cost of Goods Sold (COGS)</span>
-                <span className="font-mono text-rose-600">-₹{(financialMIS.monthlyRevenue * (1 - financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              <div className="bg-white/80 p-3.5 rounded-xl border border-amber-100 shadow-2xs">
+                <span className="text-slate-500 font-medium">Threshold Breach Alerts:</span>
+                <p className="text-lg font-bold text-amber-900 mt-1 font-mono">
+                  {budgetAlertCount} Items &gt; ±5%
+                </p>
+                <p className="text-[11px] text-amber-700 mt-0.5">Flagged for CFO and management variance review</p>
               </div>
 
-              <div className="py-2.5 flex items-center justify-between font-bold text-indigo-900 bg-indigo-50/40 px-2 rounded">
-                <span>Gross Profit ({financialMIS.grossMarginPercent}%)</span>
-                <span className="font-mono">₹{(financialMIS.monthlyRevenue * (financialMIS.grossMarginPercent / 100)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between text-slate-600">
-                <span className="pl-4">Less: Employee Expenses & Payroll</span>
-                <span className="font-mono text-rose-600">-₹12,40,000</span>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between text-slate-600">
-                <span className="pl-4">Less: Sales, Marketing & Administrative Opex</span>
-                <span className="font-mono text-rose-600">-₹9,27,000</span>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between font-bold text-slate-900 bg-slate-50 px-2 rounded">
-                <span>EBITDA ({financialMIS.ebitdaMarginPercent}%)</span>
-                <span className="font-mono text-sm">₹{financialMIS.ebitda.toLocaleString('en-IN')}</span>
-              </div>
-
-              <div className="py-3 flex items-center justify-between font-extrabold text-emerald-900 bg-emerald-50 px-3 rounded-lg text-sm border border-emerald-200">
-                <span>Net Profit After Tax (PAT)</span>
-                <span className="font-mono">₹{financialMIS.netProfit.toLocaleString('en-IN')}</span>
+              <div className="bg-white/80 p-3.5 rounded-xl border border-amber-100 shadow-2xs">
+                <span className="text-slate-500 font-medium">Data Ingestion:</span>
+                <p className="text-base font-bold text-emerald-800 mt-1 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Excel Import Ready
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Bulk uploads supported with instant row-by-row mapping</p>
               </div>
             </div>
           </div>
@@ -1225,7 +1286,14 @@ export const FinancialMisTab: React.FC = () => {
         />
       )}
 
-      {/* SUB-VIEW 6: CONSOLIDATED ALL STATEMENTS */}
+      {/* SUB-VIEW 6: BUDGET & VARIANCE ANALYSIS */}
+      {activeSubTab === 'budget' && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          <BudgetTab />
+        </div>
+      )}
+
+      {/* SUB-VIEW 7: CONSOLIDATED ALL STATEMENTS */}
       {activeSubTab === 'all' && (
         <div className="space-y-10 animate-in fade-in duration-200">
           <div className="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1233,11 +1301,11 @@ export const FinancialMisTab: React.FC = () => {
               <h2 className="text-base font-bold flex items-center gap-2">
                 <span>Comprehensive Financial MIS Dossier</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
-                  Full 4-Statement Package
+                  Full 5-Module Package (Statements & FP&A)
                 </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {clientProfile.companyName} • Balance Sheet, P&L Account, Debtor Ageing & Fund Flow
+                {clientProfile.companyName} • Balance Sheet, P&L Account, Debtor Ageing, Fund Flow & Budget/Variance
               </p>
             </div>
             <button
@@ -1291,6 +1359,14 @@ export const FinancialMisTab: React.FC = () => {
                 fundFlow={activeFundFlow}
                 clientProfile={clientProfile}
               />
+            </section>
+
+            <section className="pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                <span>Section V: Month-wise Budget & Variance Analysis (FP&A)</span>
+              </h3>
+              <BudgetTab />
             </section>
           </div>
         </div>

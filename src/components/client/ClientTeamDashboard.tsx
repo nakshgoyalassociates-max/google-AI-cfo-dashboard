@@ -19,6 +19,16 @@ import {
   Filter
 } from 'lucide-react';
 import { ComplianceItem } from '../../types';
+import { DueDateBadge } from '../common/DueDateBadge';
+import { formatLakhs } from '../../utils/format';
+import { formatDueDate } from '../../utils/dueDate';
+import { 
+  getComplianceFourColorStatus, 
+  getActionFourColorStatus, 
+  getLineItemRowClasses 
+} from '../../utils/statusColors';
+import { ComplianceSubtaskProgressIcons } from '../common/ComplianceSubtaskProgressIcons';
+import { ActionSubtaskProgressIcons } from '../common/ActionSubtaskProgressIcons';
 
 export const ClientTeamDashboard: React.FC = () => {
   const { 
@@ -249,22 +259,24 @@ export const ClientTeamDashboard: React.FC = () => {
             </div>
 
             {/* List */}
-            <div className="divide-y divide-slate-100 mt-2">
+            <div className="space-y-2 mt-2">
               {displayedCompliances.slice(0, 7).map(item => {
                 const isDraftPending = item.subtasks[0].status === 'pending';
                 const isCfoReview = item.subtasks[0].status === 'completed' && item.subtasks[1].status === 'pending';
                 const isReadyToPayAndFile = item.subtasks[1].status === 'completed' && item.subtasks[2].status === 'pending';
                 const isFullyDone = item.subtasks[2].status === 'completed';
+                const itemStatus = getComplianceFourColorStatus(item);
+                const rowClasses = getLineItemRowClasses(itemStatus);
 
                 return (
-                  <div key={item.id} className="py-3.5 hover:bg-slate-50/70 rounded-lg px-2 transition-colors">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  <div key={item.id} className={`py-2 px-3 rounded-lg border transition-colors ${rowClasses}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-slate-100 text-slate-700 leading-none">
                             {item.category}
                           </span>
-                          <span className="text-xs font-bold text-slate-900 hover:text-sky-600 transition-colors cursor-pointer" onClick={() => setSelectedCompliance(item)}>
+                          <span className="text-xs font-bold text-slate-900 hover:text-sky-600 transition-colors cursor-pointer leading-tight" onClick={() => setSelectedCompliance(item)}>
                             {item.name}
                           </span>
                           <span className="text-[10px] text-slate-400">
@@ -272,38 +284,37 @@ export const ClientTeamDashboard: React.FC = () => {
                           </span>
                         </div>
                         
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                          <span className="flex items-center gap-1 font-medium text-slate-700">
-                            <Calendar className="w-3 h-3 text-slate-400" />
-                            Statutory Due: {item.statutoryDueDate.split(' ')[0]}
-                          </span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 leading-tight">
+                          <DueDateBadge item={item} compact={true} />
                           {item.taxAmount && (
-                            <span className="text-slate-700 font-mono">
-                              Tax: ₹{(item.taxAmount / 100000).toFixed(2)}L
+                            <span className="text-slate-700 font-mono text-[10.5px]">
+                              Tax: {formatLakhs(item.taxAmount)}
                             </span>
                           )}
                           {item.arnOrChallanNo && (
-                            <span className="text-emerald-700 font-mono text-[11px]">
+                            <span className="text-green-800 font-mono text-[10.5px] font-bold">
                               Challan: {item.arnOrChallanNo}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Action Stage Button */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      {/* Small icons showing where task is stuck + Action Stage Button */}
+                      <div className="flex items-center gap-2 flex-wrap shrink-0">
+                        <ComplianceSubtaskProgressIcons compliance={item} compact={true} />
+
                         {isDraftPending && (
                           <button
                             onClick={() => toggleSubtask(item.id, 1, 'Draft collated by Accounts Team')}
-                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            className="px-2.5 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer leading-tight"
                           >
                             <Send className="w-3 h-3" />
-                            <span>Submit Draft to CFO</span>
+                            <span>Submit Draft</span>
                           </button>
                         )}
 
                         {isCfoReview && (
-                          <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 leading-tight">
                             <Clock className="w-3 h-3" />
                             <span>In CFO Review</span>
                           </span>
@@ -312,16 +323,16 @@ export const ClientTeamDashboard: React.FC = () => {
                         {isReadyToPayAndFile && (
                           <button
                             onClick={() => toggleSubtask(item.id, 3, 'Challan generated & filed by Tax Desk', 'CHL-2026-SEP')}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer leading-tight"
                           >
                             <Upload className="w-3 h-3" />
-                            <span>Mark Filed & Paid</span>
+                            <span>Mark Filed</span>
                           </button>
                         )}
 
                         {isFullyDone && (
-                          <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-green-100 text-green-800 border border-green-300 flex items-center gap-1 leading-tight font-bold">
+                            <CheckCircle2 className="w-3 h-3 text-green-700" />
                             <span>100% Filed</span>
                           </span>
                         )}
@@ -329,7 +340,7 @@ export const ClientTeamDashboard: React.FC = () => {
                         <button
                           onClick={() => setSelectedCompliance(item)}
                           title="View Details"
-                          className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
@@ -367,38 +378,41 @@ export const ClientTeamDashboard: React.FC = () => {
               </span>
             </div>
 
-            <div className="divide-y divide-slate-100 mt-2">
-              {operationalActions.slice(0, 4).map(action => (
-                <div key={action.id} className="py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900 line-clamp-1">
-                        {action.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                        {action.description}
-                      </p>
-                    </div>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
-                      action.priority === 'Urgent' ? 'bg-red-50 text-red-700 border border-red-200' :
-                      action.priority === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {action.priority}
-                    </span>
-                  </div>
+            <div className="space-y-2 mt-2">
+              {operationalActions.slice(0, 4).map(action => {
+                const actStatus = getActionFourColorStatus(action);
+                const rowClasses = getLineItemRowClasses(actStatus);
 
-                  <div className="flex items-center justify-between mt-2 pt-1 text-[11px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <User className="w-3 h-3 text-slate-400" />
-                      {action.assignedTo}
-                    </span>
-                    <span className="text-slate-600 font-medium">
-                      Due: {action.fixedDeadline.split(' ')[0]}
-                    </span>
+                return (
+                  <div key={action.id} className={`py-2 px-3 rounded-lg border transition-colors space-y-1.5 ${rowClasses}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 line-clamp-1 leading-tight">
+                          {action.title}
+                        </h4>
+                        <p className="text-[10.5px] text-slate-500 mt-0.5 line-clamp-1 leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                      <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-semibold shrink-0 leading-none ${
+                        action.priority === 'Urgent' ? 'bg-red-50 text-red-700 border border-red-200' :
+                        action.priority === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {action.priority}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 border-t border-slate-200/50 text-[10.5px] text-slate-500 gap-1.5">
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3 text-slate-400" />
+                        {action.assignedTo} • Due: {formatDueDate(action.fixedDeadline)}
+                      </span>
+                      <ActionSubtaskProgressIcons action={action} compact={true} />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="pt-3 border-t border-slate-100">

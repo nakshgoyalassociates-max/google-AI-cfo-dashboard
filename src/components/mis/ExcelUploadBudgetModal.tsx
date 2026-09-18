@@ -18,6 +18,7 @@ import {
   generateBudgetTemplateExcel, 
   ParsedExcelRow 
 } from '../../utils/excelBudgetHelper';
+import { formatINR } from '../../utils/format';
 
 interface ExcelUploadBudgetModalProps {
   isOpen: boolean;
@@ -349,10 +350,10 @@ export const ExcelUploadBudgetModal: React.FC<ExcelUploadBudgetModalProps> = ({
                                   {r.name}
                                 </td>
                                 <td className="py-2 px-3 text-right font-mono text-slate-600">
-                                  {r.budget !== undefined ? `₹${r.budget.toLocaleString('en-IN')}` : '-'}
+                                  {r.budget !== undefined ? formatINR(r.budget) : '-'}
                                 </td>
                                 <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
-                                  ₹{r.actual.toLocaleString('en-IN')}
+                                  {formatINR(r.actual)}
                                 </td>
                                 <td className={`py-2 px-3 text-right font-mono font-bold ${
                                   isBreach 

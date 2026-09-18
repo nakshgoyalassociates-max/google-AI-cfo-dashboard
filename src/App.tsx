@@ -7,8 +7,6 @@ import { ClientTeamDashboard } from './components/client/ClientTeamDashboard';
 import { ComplianceMasterTab } from './components/compliances/ComplianceMasterTab';
 import { ActionPendenciesTab } from './components/actions/ActionPendenciesTab';
 import { FinancialMisTab } from './components/mis/FinancialMisTab';
-import { BudgetTab } from './components/mis/BudgetTab';
-import { InvoiceTrackingTab } from './components/invoices/InvoiceTrackingTab';
 import { NewActionModal } from './components/modals/NewActionModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { ShieldCheck, CheckCircle, AlertCircle, Info, Sparkles } from 'lucide-react';
@@ -29,8 +27,6 @@ const MainLayout: React.FC = () => {
       if (activeTab === 'compliances') return <ComplianceMasterTab />;
       if (activeTab === 'actions') return <ActionPendenciesTab />;
       if (activeTab === 'mis') return <FinancialMisTab />;
-      if (activeTab === 'budget') return <BudgetTab />;
-      if (activeTab === 'invoices') return <InvoiceTrackingTab />;
       return <ClientDashboard />;
     }
 
@@ -39,8 +35,6 @@ const MainLayout: React.FC = () => {
     if (activeTab === 'compliances') return <ComplianceMasterTab />;
     if (activeTab === 'actions') return <ActionPendenciesTab />;
     if (activeTab === 'mis') return <FinancialMisTab />;
-    if (activeTab === 'budget') return <BudgetTab />;
-    if (activeTab === 'invoices') return <InvoiceTrackingTab />;
     return <CfoDashboard />;
   };
 

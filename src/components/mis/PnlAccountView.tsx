@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PnlStatementData, ClientProfile } from '../../types';
+import { formatINR } from '../../utils/format';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -23,13 +24,7 @@ export const PnlAccountView: React.FC<PnlAccountViewProps> = ({ pnlStatement, cl
   const [showInLakhs, setShowInLakhs] = useState(true);
 
   const formatAmount = (amt: number): string => {
-    if (showInLakhs) {
-      if (Math.abs(amt) >= 10000000) {
-        return `₹${(amt / 10000000).toFixed(2)} Cr`;
-      }
-      return `₹${(amt / 100000).toFixed(2)} L`;
-    }
-    return `₹${amt.toLocaleString('en-IN')}`;
+    return formatINR(amt, showInLakhs);
   };
 
   const { income, expenses, profitability, lineItems } = pnlStatement;

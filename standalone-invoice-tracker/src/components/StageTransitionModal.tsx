@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
-import { TrackedInvoice, InvoiceStage } from '../../types';
+import { useInvoiceApp } from '../context/InvoiceContext';
+import { TrackedInvoice, InvoiceStage } from '../types';
 import { getCategoryStyle } from './InvoiceTrackingTab';
 import { 
   ArrowRight, 
@@ -32,7 +32,7 @@ const StageTransitionModalContent: React.FC<StageTransitionModalContentProps> = 
   invoice,
   onClose
 }) => {
-  const { advanceInvoiceStage, currentUser } = useApp();
+  const { advanceInvoiceStage, currentUser } = useInvoiceApp();
 
   // Determine target next stage
   const getNextStage = (curr: InvoiceStage): InvoiceStage | null => {

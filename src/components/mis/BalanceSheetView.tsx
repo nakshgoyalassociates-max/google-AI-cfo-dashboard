@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BalanceSheetData, ClientProfile } from '../../types';
+import { formatINR } from '../../utils/format';
 import { 
   Scale, 
   CheckCircle2, 
@@ -36,13 +37,7 @@ export const BalanceSheetView: React.FC<BalanceSheetViewProps> = ({ balanceSheet
   };
 
   const formatAmount = (amt: number): string => {
-    if (showInLakhs) {
-      if (Math.abs(amt) >= 10000000) {
-        return `₹${(amt / 10000000).toFixed(2)} Cr`;
-      }
-      return `₹${(amt / 100000).toFixed(2)} L`;
-    }
-    return `₹${amt.toLocaleString('en-IN')}`;
+    return formatINR(amt, showInLakhs);
   };
 
   const { equityAndLiabilities: el, assets: as } = balanceSheet;

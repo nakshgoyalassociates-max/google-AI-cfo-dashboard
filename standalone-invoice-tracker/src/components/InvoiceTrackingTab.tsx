@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../context/AppContext';
-import { TrackedInvoice, InvoiceStage, InvoiceCategory } from '../../types';
+import { useInvoiceApp } from '../context/InvoiceContext';
+import { TrackedInvoice, InvoiceStage, InvoiceCategory } from '../types';
 import { GuardInvoiceScannerModal } from './GuardInvoiceScannerModal';
 import { StageTransitionModal } from './StageTransitionModal';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
@@ -107,7 +107,7 @@ export const InvoiceTrackingTab: React.FC = () => {
     invoices, 
     invoiceStats, 
     deleteInvoice
-  } = useApp();
+  } = useInvoiceApp();
 
   // Modals state
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);

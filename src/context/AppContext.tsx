@@ -11,11 +11,9 @@ import {
   UserAccount,
   CompanyOverviewSummary,
   CriticalDelayedItem,
-  TrackedInvoice,
-  InvoiceStage,
-  SlaStatus,
   BudgetLineItem,
-  BudgetMonthKey
+  BudgetMonthKey,
+  MisSubTab
 } from '../types';
 import { COMPLIANCE_MASTER_LIST } from '../data/complianceMaster';
 import { 
@@ -30,8 +28,8 @@ import {
   ALL_COMPANIES_COMPLIANCES,
   ALL_COMPANIES_ACTIONS
 } from '../data/companyData';
-import { INITIAL_TRACKED_INVOICES } from '../data/mockInvoices';
 import { INITIAL_NEXORA_BUDGET_ITEMS } from '../data/mockBudgetData';
+import { nextDueDate, daysUntilDue, formatDueDate, compareDueDates } from '../utils/dueDate';
 
 interface AppContextType {
   role: Role;
@@ -52,9 +50,12 @@ interface AppContextType {
   allCompaniesOverview: CompanyOverviewSummary[];
   criticalDelayedItems: CriticalDelayedItem[];
   approveCfoComplianceReview: (companyId: string, complianceId: string) => void;
-  switchCompanyAndTab: (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => void;
-  activeTab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget';
-  setActiveTab: (tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => void;
+  switchCompanyAndTab: (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis', subTab?: MisSubTab) => void;
+  activeTab: 'dashboard' | 'compliances' | 'actions' | 'mis';
+  setActiveTab: (tab: 'dashboard' | 'compliances' | 'actions' | 'mis') => void;
+  misSubTab: MisSubTab;
+  setMisSubTab: (subTab: MisSubTab) => void;
+  openMisWithSubTab: (subTab: MisSubTab) => void;
   budgetItems: BudgetLineItem[];
   selectedBudgetMonth: BudgetMonthKey;
   setSelectedBudgetMonth: (month: BudgetMonthKey) => void;
@@ -77,23 +78,6 @@ interface AppContextType {
   addActionSubtask: (actionId: string, title: string) => void;
   financialMIS: FinancialMIS;
   updateFinancialMIS: (data: Partial<FinancialMIS>) => void;
-  invoices: TrackedInvoice[];
-  addInvoice: (invoice: TrackedInvoice) => void;
-  updateInvoice: (invoice: TrackedInvoice) => void;
-  advanceInvoiceStage: (invoiceId: string, nextStage: InvoiceStage, stageData?: Record<string, any>) => void;
-  deleteInvoice: (invoiceId: string) => void;
-  invoiceStats: {
-    total: number;
-    critical: number;
-    guard: number;
-    grnQc: number;
-    erp: number;
-    accountHead: number;
-    accountsBooking: number;
-    booked: number;
-    totalAmount: number;
-    criticalAmount: number;
-  };
   clientProfile: ClientProfile;
   filterOptions: FilterOptions;
   setFilterOptions: React.Dispatch<React.SetStateAction<FilterOptions>>;
@@ -128,7 +112,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const COMPLIANCES_KEY = 'vcfo_compliances_v1';
 const ACTIONS_KEY = 'vcfo_actions_v1';
 const MIS_KEY = 'vcfo_mis_v1';
-const INVOICES_KEY = 'vcfo_tracked_invoices_v3';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Current user & authentication state
@@ -142,29 +125,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [role, setRoleState] = useState<Role>(currentUser.role);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTabState] = useState<'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget'>('dashboard');
+  const [activeTab, setActiveTabState] = useState<'dashboard' | 'compliances' | 'actions' | 'mis'>('dashboard');
+  const [misSubTab, setMisSubTab] = useState<MisSubTab>('overview');
   const [companies] = useState<ClientProfile[]>(CLIENT_COMPANIES);
-
-  // Invoices state with SLA recalculation
-  const [invoices, setInvoices] = useState<TrackedInvoice[]>(() => {
-    try {
-      const saved = localStorage.getItem(INVOICES_KEY);
-      if (saved) {
-        const parsed: TrackedInvoice[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_TRACKED_INVOICES;
-  });
-
-  // Persist invoices
-  useEffect(() => {
-    try {
-      localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
-    } catch (err) {
-      console.error('Failed saving invoices:', err);
-    }
-  }, [invoices]);
 
   // Selected company ID (strictly enforced for non-CFO roles)
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string>(() => {
@@ -460,13 +423,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const setActiveTab = (tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => {
+  const setActiveTab = (tab: 'dashboard' | 'compliances' | 'actions' | 'mis') => {
     if (role === 'client_team' && tab !== 'compliances' && tab !== 'actions') {
       showToast('Client team has operational access only to Compliance Master and Action Items.');
       setActiveTabState('compliances');
       return;
     }
     setActiveTabState(tab);
+  };
+
+  const openMisWithSubTab = (subTab: MisSubTab) => {
+    if (role === 'client_team') {
+      showToast('Client team has operational access only to Compliance Master and Action Items.');
+      return;
+    }
+    setMisSubTab(subTab);
+    setActiveTabState('mis');
   };
 
   const setSelectedCompanyId = (companyId: string) => {
@@ -494,12 +466,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTabState('dashboard');
   };
 
-  const switchCompanyAndTab = (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis' | 'invoices' | 'budget') => {
+  const switchCompanyAndTab = (companyId: string, tab: 'dashboard' | 'compliances' | 'actions' | 'mis', subTab?: MisSubTab) => {
     setSelectedCompanyId(companyId);
     setCfoViewMode('single_company');
+    if (subTab) {
+      setMisSubTab(subTab);
+    }
     setActiveTabState(tab);
     const comp = companies.find(c => c.id === companyId);
-    showToast(`Workspace switched to ${comp?.companyName || 'Company'}: editing ${tab.toUpperCase()}`);
+    showToast(`Workspace switched to ${comp?.companyName || 'Company'}: viewing ${tab.toUpperCase()}`);
   };
 
   const approveCfoComplianceReview = (companyId: string, complianceId: string) => {
@@ -572,11 +547,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAllCompliancesMap(ALL_COMPANIES_COMPLIANCES);
     setAllActionsMap(ALL_COMPANIES_ACTIONS);
     setAllMISMap(COMPANY_FINANCIAL_MIS);
-    setInvoices(INITIAL_TRACKED_INVOICES);
     localStorage.removeItem('vcfo_multi_compliances_v2');
     localStorage.removeItem('vcfo_multi_actions_v2');
     localStorage.removeItem('vcfo_multi_mis_v2');
-    localStorage.removeItem(INVOICES_KEY);
     localStorage.removeItem(COMPLIANCES_KEY);
     localStorage.removeItem(ACTIONS_KEY);
     localStorage.removeItem(MIS_KEY);
@@ -620,9 +593,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return !isNaN(d.getTime()) && d < now;
       }).length;
 
-      const pendingCompliances = compList.filter(c => !c.subtasks || !c.subtasks[2] || c.subtasks[2].status !== 'completed');
-      const nextUpcomingDeadline = pendingCompliances.length > 0 
-        ? pendingCompliances[0].statutoryDueDate 
+      const pendingCompliances = compList
+        .filter(c => !c.subtasks || !c.subtasks[2] || c.subtasks[2].status !== 'completed')
+        .sort(compareDueDates);
+      const earliestPending = pendingCompliances[0];
+      const nextUpcomingDeadline = earliestPending 
+        ? `${earliestPending.name} (${formatDueDate(nextDueDate(earliestPending))})` 
         : 'All filings up to date';
 
       return {
@@ -673,6 +649,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         // Critical or CFO Review pending
         if (!isFiled && (comp.criticality === 'Critical' || isCfoReviewPending)) {
+          const dueIso = nextDueDate(comp);
+          const days = daysUntilDue(comp);
+          const formatted = dueIso ? formatDueDate(dueIso) : comp.statutoryDueDate.split(';')[0];
+          const daysTag = days !== null 
+            ? (days < 0 ? ` (${Math.abs(days)}d overdue)` : days === 0 ? ' (Today)' : ` (${days}d left)`)
+            : '';
+
           list.push({
             id: `crit-comp-${company.id}-${comp.id}`,
             type: 'compliance',
@@ -680,13 +663,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             companyName: company.companyName,
             title: `${comp.name} (${comp.category})`,
             category: comp.category,
-            severity: isCfoReviewPending ? 'Critical' : 'Delayed',
-            deadlineOrAge: `Due: ${comp.statutoryDueDate.split(';')[0]}`,
+            severity: (days !== null && days < 0) ? 'Overdue' : isCfoReviewPending ? 'Critical' : 'Delayed',
+            deadlineOrAge: `Due: ${formatted}${daysTag}`,
             assigneeOrDept: isCfoReviewPending ? 'CFO Review Pending' : (subtasks[0]?.status === 'pending' ? 'Team Collation' : 'Filing Desk'),
             penaltyOrRisk: comp.penaltyClause || 'Statutory late fees, penalty notice, and interest under relevant Act',
             financialAmount: comp.taxAmount,
             stageInfo: isCfoReviewPending ? 'Subtask 2 awaiting CFO Sign-Off' : 'Draft collation in progress',
-            cfoReviewPending: isCfoReviewPending
+            cfoReviewPending: isCfoReviewPending,
+            rawDueDate: dueIso || '9999-12-31'
           });
         }
       });
@@ -702,6 +686,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const isUrgent = act.priority === 'Urgent';
 
           if (isOverdue || isUrgent) {
+            const iso = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '9999-12-31';
             list.push({
               id: `crit-act-${company.id}-${act.id}`,
               type: 'action',
@@ -714,36 +699,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               assigneeOrDept: `${act.assignedTo} (${act.assignedRole || 'Finance Team'})`,
               penaltyOrRisk: act.remarks || act.description,
               stageInfo: `${act.status} • Priority: ${act.priority}`,
-              cfoReviewPending: false
+              cfoReviewPending: false,
+              rawDueDate: iso
             });
           }
         }
       });
     });
 
-    // 3. Delayed Invoices (>2 days SLA breach)
-    (invoices || []).forEach(inv => {
-      if (inv.currentStage !== 'booked' && (inv.slaStatus === 'critical' || inv.dwellTimeHours >= 48)) {
-        list.push({
-          id: `crit-inv-${inv.id}`,
-          type: 'invoice',
-          companyId: 'client-101',
-          companyName: clientProfile.companyName,
-          title: `Invoice #${inv.invoiceNumber} • ${inv.vendorName}`,
-          category: inv.category,
-          severity: 'Critical',
-          deadlineOrAge: `Dwell Time: ${inv.dwellTimeHours}h (>48h SLA)`,
-          assigneeOrDept: inv.currentDepartment,
-          penaltyOrRisk: `Vendor supply disruption risk; stuck at ${inv.currentStageTitle}. Value: ₹${inv.totalAmount.toLocaleString('en-IN')}`,
-          financialAmount: inv.totalAmount,
-          stageInfo: `Stage: ${inv.currentStageTitle}`,
-          cfoReviewPending: inv.currentStage === 'account_head'
-        });
-      }
+    // Sort every deadline list by nextDueDate / deadline ascending
+    return list.sort((a, b) => {
+      const dateA = a.rawDueDate || '9999-12-31';
+      const dateB = b.rawDueDate || '9999-12-31';
+      return dateA.localeCompare(dateB);
     });
-
-    return list;
-  }, [companies, allCompliancesMap, allActionsMap, invoices, clientProfile]);
+  }, [companies, allCompliancesMap, allActionsMap, clientProfile]);
 
   const toggleSubtask = (
     complianceId: string, 
@@ -1071,132 +1041,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [compliances, actions]);
 
-  // Invoice Management Operations
-  const addInvoice = (newInvoice: TrackedInvoice) => {
-    setInvoices(prev => [newInvoice, ...prev]);
-    showToast(`Invoice #${newInvoice.invoiceNumber} recorded at Gate Inward and queued for GRN/QC`);
-  };
-
-  const updateInvoice = (updated: TrackedInvoice) => {
-    setInvoices(prev => prev.map(inv => inv.id === updated.id ? updated : inv));
-    showToast(`Invoice #${updated.invoiceNumber} updated`);
-  };
-
-  const deleteInvoice = (invoiceId: string) => {
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-    showToast('Invoice entry deleted');
-  };
-
-  const advanceInvoiceStage = (
-    invoiceId: string, 
-    nextStage: InvoiceStage, 
-    stageData?: Record<string, any>
-  ) => {
-    setInvoices(prev => {
-      return prev.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-
-        const nowIso = new Date().toISOString();
-        const stageTitles: Record<InvoiceStage, string> = {
-          guard: 'Gate Receipt (Guard)',
-          grn_qc: 'GRN & Quality Check Dept',
-          erp: 'ERP Person Entry',
-          account_head: 'Account Head Approval',
-          accounts_booking: 'In Accounts for Booking',
-          booked: 'Completed & Booked in Ledger'
-        };
-
-        const newHistoryItem = {
-          id: `hist-${Date.now()}`,
-          stage: nextStage,
-          stageTitle: stageTitles[nextStage] || nextStage,
-          action: stageData?.actionSummary || `Moved to ${stageTitles[nextStage]}`,
-          actorName: currentUser.name,
-          actorRole: currentUser.roleTitle,
-          timestamp: nowIso,
-          daysSpent: inv.daysInCurrentStage,
-          notes: stageData?.notes || stageData?.qcRemarks || stageData?.erpRemarks || stageData?.approvalRemarks || stageData?.bookingRemarks || ''
-        };
-
-        const updated: TrackedInvoice = {
-          ...inv,
-          currentStage: nextStage,
-          stageEnteredAt: nowIso,
-          daysInCurrentStage: 0,
-          slaStatus: 'on_track',
-          isCritical: false,
-          criticalReason: undefined,
-          history: [...inv.history, newHistoryItem]
-        };
-
-        if (stageData?.grnDetails) {
-          updated.grnDetails = { ...(updated.grnDetails || {}), ...stageData.grnDetails };
-        }
-        if (stageData?.erpDetails) {
-          updated.erpDetails = { ...(updated.erpDetails || {}), ...stageData.erpDetails };
-        }
-        if (stageData?.accountHeadDetails) {
-          updated.accountHeadDetails = { ...(updated.accountHeadDetails || {}), ...stageData.accountHeadDetails };
-        }
-        if (stageData?.bookingDetails) {
-          updated.bookingDetails = { ...(updated.bookingDetails || {}), ...stageData.bookingDetails };
-        }
-
-        return updated;
-      });
-    });
-
-    if (nextStage === 'booked') {
-      try {
-        confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
-      } catch {}
-      showToast('🎉 Invoice successfully booked in ledger and payment scheduled!');
-    } else {
-      showToast(`Invoice progressed to ${nextStage.replace('_', ' ').toUpperCase()} successfully`);
-    }
-  };
-
-  // Invoice Statistics with strict 2-day SLA computation
-  const invoiceStats = useMemo(() => {
-    const list = invoices || [];
-    let critical = 0;
-    let guard = 0;
-    let grnQc = 0;
-    let erp = 0;
-    let accountHead = 0;
-    let accountsBooking = 0;
-    let booked = 0;
-    let totalAmount = 0;
-    let criticalAmount = 0;
-
-    list.forEach(inv => {
-      totalAmount += inv.totalAmount || 0;
-      if (inv.isCritical || inv.daysInCurrentStage > 2.0) {
-        critical++;
-        criticalAmount += inv.totalAmount || 0;
-      }
-      if (inv.currentStage === 'guard') guard++;
-      else if (inv.currentStage === 'grn_qc') grnQc++;
-      else if (inv.currentStage === 'erp') erp++;
-      else if (inv.currentStage === 'account_head') accountHead++;
-      else if (inv.currentStage === 'accounts_booking') accountsBooking++;
-      else if (inv.currentStage === 'booked') booked++;
-    });
-
-    return {
-      total: list.length,
-      critical,
-      guard,
-      grnQc,
-      erp,
-      accountHead,
-      accountsBooking,
-      booked,
-      totalAmount,
-      criticalAmount
-    };
-  }, [invoices]);
-
   return (
     <AppContext.Provider
       value={{
@@ -1221,6 +1065,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchCompanyAndTab,
         activeTab,
         setActiveTab,
+        misSubTab,
+        setMisSubTab,
+        openMisWithSubTab,
         compliances,
         toggleSubtask,
         updateCompliance,
@@ -1240,12 +1087,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateLineItemBudget,
         bulkUpdateActualsFromExcel,
         resetBudgetData,
-        invoices,
-        addInvoice,
-        updateInvoice,
-        advanceInvoiceStage,
-        deleteInvoice,
-        invoiceStats,
         clientProfile,
         filterOptions,
         setFilterOptions,

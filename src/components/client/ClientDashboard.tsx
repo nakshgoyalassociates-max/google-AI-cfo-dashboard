@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
+import { DueDateBadge } from '../common/DueDateBadge';
+import { compareDueDates } from '../../utils/dueDate';
+import { formatLakhs, formatCrores } from '../../utils/format';
 import { ProgressBar } from '../common/ProgressBar';
+import { 
+  getComplianceFourColorStatus, 
+  getActionFourColorStatus, 
+  getLineItemRowClasses 
+} from '../../utils/statusColors';
+import { ComplianceSubtaskProgressIcons } from '../common/ComplianceSubtaskProgressIcons';
+import { ActionSubtaskProgressIcons } from '../common/ActionSubtaskProgressIcons';
 import { 
   ShieldCheck, 
   TrendingUp, 
@@ -25,7 +35,8 @@ import {
   ReceiptText,
   Scale,
   ArrowRightLeft,
-  Users
+  Users,
+  Calculator
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -36,7 +47,7 @@ export const ClientDashboard: React.FC = () => {
     actions, 
     stats,
     setActiveTab,
-    invoiceStats
+    openMisWithSubTab
   } = useApp();
 
   const handlePrint = () => {
@@ -73,9 +84,10 @@ export const ClientDashboard: React.FC = () => {
     };
   });
 
-  // Next 4 upcoming statutory deadlines
+  // Next 4 upcoming statutory deadlines (sorted by nextDueDate ascending)
   const upcomingFilings = compliances
     .filter(c => !c.subtasks || c.subtasks[2]?.status !== 'completed')
+    .sort(compareDueDates)
     .slice(0, 4);
 
   // 2. Broad Action Items Breakdown
@@ -268,7 +280,7 @@ export const ClientDashboard: React.FC = () => {
 
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-slate-900">
-                ₹{(financialMIS.monthlyRevenue / 100000).toFixed(1)}L
+                {formatLakhs(financialMIS.monthlyRevenue, 1)}
               </span>
               <span className="text-xs font-medium text-slate-500">Monthly Net Revenue</span>
             </div>
@@ -281,11 +293,11 @@ export const ClientDashboard: React.FC = () => {
             <div className="mt-3 text-xs text-slate-600 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Cash in Bank:</span>
-                <span className="font-semibold text-slate-900">₹{(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr</span>
+                <span className="font-semibold text-slate-900">{formatCrores(financialMIS.cashAndBankBalance)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">MSME &gt;45D Risk:</span>
-                <span className="font-semibold text-amber-700">₹{(financialMIS.creditorsOver45Days / 100000).toFixed(2)}L Pending</span>
+                <span className="font-semibold text-amber-700">{formatLakhs(financialMIS.creditorsOver45Days)} Pending</span>
               </div>
             </div>
           </div>
@@ -298,83 +310,27 @@ export const ClientDashboard: React.FC = () => {
 
       </div>
 
-      {/* BROAD PICTURE 1: FINANCIAL MIS SECTION */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-indigo-600" />
-              Broad Picture: Financial MIS & Unit Economics
+      {/* 5 CORE FINANCIAL MIS STATEMENT FAST LAUNCH BAR */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-bold text-slate-900">
+              Financial MIS Core Statements
             </h2>
-            <p className="text-xs text-slate-500">
-              High-level profitability, working capital health, and CFO strategic advisory notes
-            </p>
           </div>
           <button
             onClick={() => setActiveTab('mis')}
             className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
           >
-            <span>View Complete Financial MIS Deck</span>
-            <ArrowRight className="w-3 h-3" />
+            <span>Open Financial MIS</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* 4 Key Executive Financial Vitals */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            title="Monthly Revenue"
-            value={`₹${(financialMIS.monthlyRevenue / 100000).toFixed(1)} Lakhs`}
-            subtitle="Net sales revenue for August 2026"
-            icon={TrendingUp}
-            trend={{
-              value: `+${financialMIS.revenueGrowthMoM}%`,
-              isPositive: true,
-              label: 'MoM Growth'
-            }}
-            iconBgColor="bg-emerald-50 text-emerald-600 border-emerald-200"
-          />
-
-          <MetricCard
-            title="Operating EBITDA"
-            value={`₹${(financialMIS.ebitda / 100000).toFixed(1)} Lakhs`}
-            subtitle={`${financialMIS.ebitdaMarginPercent}% Operating EBITDA Margin`}
-            icon={ArrowUpRight}
-            badge={{
-              text: '23.5% Margin',
-              variant: 'success'
-            }}
-            iconBgColor="bg-indigo-50 text-indigo-600 border-indigo-200"
-          />
-
-          <MetricCard
-            title="Cash & Runway"
-            value={`₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`}
-            subtitle={`${financialMIS.cashRunwayMonths} Months Zero-Revenue Runway`}
-            icon={IndianRupee}
-            badge={{
-              text: `${financialMIS.cashRunwayMonths} Mo. Runway`,
-              variant: 'info'
-            }}
-            iconBgColor="bg-sky-50 text-sky-600 border-sky-200"
-          />
-
-          <MetricCard
-            title="Working Capital"
-            value={`₹${(financialMIS.workingCapital / 100000).toFixed(1)} Lakhs`}
-            subtitle={`Quick Ratio: ${financialMIS.quickRatio}x (Healthy)`}
-            icon={ShieldCheck}
-            badge={{
-              text: 'Strong Liquidity',
-              variant: 'success'
-            }}
-            iconBgColor="bg-teal-50 text-teal-600 border-teal-200"
-          />
-        </div>
-
-        {/* 4 Core Financial Statement Fast Navigation Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           <button
-            onClick={() => setActiveTab('mis')}
+            onClick={() => openMisWithSubTab('balance-sheet')}
             className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50/50 hover:border-indigo-300 text-left transition-colors cursor-pointer group"
           >
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
@@ -389,7 +345,7 @@ export const ClientDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('mis')}
+            onClick={() => openMisWithSubTab('pnl')}
             className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-300 text-left transition-colors cursor-pointer group"
           >
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
@@ -404,7 +360,7 @@ export const ClientDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('mis')}
+            onClick={() => openMisWithSubTab('debtor-ageing')}
             className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50/50 hover:border-indigo-300 text-left transition-colors cursor-pointer group"
           >
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
@@ -419,7 +375,7 @@ export const ClientDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('mis')}
+            onClick={() => openMisWithSubTab('fund-flow')}
             className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-sky-50/50 hover:border-sky-300 text-left transition-colors cursor-pointer group"
           >
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
@@ -432,212 +388,164 @@ export const ClientDashboard: React.FC = () => {
             <p className="text-sm font-bold text-slate-900 font-mono">₹21.65 Lakhs</p>
             <span className="text-[10px] text-slate-400">Sources = Applications</span>
           </button>
-        </div>
 
-        {/* CFO Strategic Commentary & Management Action Points */}
-        <div className="bg-slate-50/70 rounded-xl border border-slate-200 p-4.5 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shrink-0 mt-0.5">
-              <Sparkles className="w-4 h-4" />
+          <button
+            onClick={() => openMisWithSubTab('budget')}
+            className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 hover:bg-amber-50 hover:border-amber-400 text-left transition-colors cursor-pointer group col-span-2 sm:col-span-1"
+          >
+            <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
+              <span className="flex items-center gap-1.5 text-slate-800 group-hover:text-amber-800 font-bold">
+                <Calculator className="w-3.5 h-3.5 text-amber-600" />
+                Budget & Variance
+              </span>
+              <span className="text-[10px] text-amber-800 font-bold bg-amber-100 border border-amber-300 px-1.5 rounded">FP&A</span>
             </div>
-            <div className="space-y-2 flex-1">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Virtual CFO Strategic Commentary • {clientProfile.cfoName}
+            <p className="text-sm font-bold text-slate-900 font-mono">±5% Tracking</p>
+            <span className="text-[10px] text-slate-500">Sales, Direct Cost & Opex</span>
+          </button>
+        </div>
+      </div>
+
+      {/* IMMEDIATE PRIORITIES COCKPIT: STATUTORY DUE DATES & URGENT ACTION ITEMS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Statutory Deadlines Due in Next 7-15 Days */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Upcoming Statutory Deadlines
                 </h3>
-                <span className="text-[11px] text-slate-500 font-medium">August 2026 Audit Ready Close</span>
+                <p className="text-[11px] text-slate-500">Next 7–15 days filing cycle</p>
               </div>
-              <p className="text-xs text-slate-700 leading-relaxed italic bg-white p-3 rounded-lg border border-slate-200">
-                "{financialMIS.cfoExecutiveSummary}"
-              </p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
-            {financialMIS.cfoKeyAlerts.map((alert, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-xs bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-lg text-amber-900">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>{alert}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* BROAD PICTURE 2: STATUTORY COMPLIANCE STATUS */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Broad Picture: Statutory Compliance Master Standing
-            </h2>
-            <p className="text-xs text-slate-500">
-              Track compliance across 5 statutory frameworks: GST, TDS, Direct Tax, ROC, and Labor Laws
-            </p>
-          </div>
-          <button
-            onClick={() => setActiveTab('compliances')}
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
-          >
-            <span>Open Full Compliance Master Table (35 Items)</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Category-wise Snapshot Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {categorySummaries.map((cat) => (
-            <div 
-              key={cat.code}
-              className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 space-y-2.5 hover:bg-white hover:border-indigo-300 transition-colors cursor-pointer"
+            <button
               onClick={() => setActiveTab('compliances')}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-slate-900">{cat.name}</span>
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                  cat.progressPct === 100 
-                    ? 'bg-emerald-100 text-emerald-800' 
-                    : cat.progressPct >= 66
-                    ? 'bg-indigo-100 text-indigo-800'
-                    : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {cat.status}
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Progress:</span>
-                  <span className="font-bold text-slate-800">{cat.progressPct}%</span>
-                </div>
-                <ProgressBar percentage={cat.progressPct} height="h-1.5" />
-              </div>
-
-              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-200/60">
-                <span>{cat.completedItems} of {cat.totalItems} Filed</span>
-                {cat.pendingReviewItems > 0 && (
-                  <span className="text-amber-700 font-semibold">{cat.pendingReviewItems} in Review</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Immediate Upcoming Statutory Deadlines */}
-        <div className="bg-slate-50/50 rounded-xl border border-slate-200 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-              Immediate Upcoming Statutory Filings in Current Cycle
-            </h3>
-            <span className="text-[11px] text-slate-500">Next 7-15 Days</span>
+              <span>View All 35 Filings</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-            {upcomingFilings.map(item => (
-              <div 
-                key={item.id} 
-                className="bg-white rounded-lg border border-slate-200 p-3 shadow-2xs flex items-center justify-between gap-3 hover:border-indigo-300 transition-colors cursor-pointer"
-                onClick={() => setActiveTab('compliances')}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                      {item.category}
-                    </span>
-                    <span className="text-xs font-bold text-slate-900">{item.name}</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                    <span>Due: <strong className="text-rose-700">{item.statutoryDueDate.split(';')[0]}</strong></span>
-                    {item.taxAmount ? <span>• Tax: ₹{(item.taxAmount / 100000).toFixed(2)}L</span> : null}
-                  </div>
-                </div>
+          <div className="space-y-2">
+            {upcomingFilings.map(item => {
+              const itemStatus = getComplianceFourColorStatus(item);
+              const rowClasses = getLineItemRowClasses(itemStatus);
 
-                <div className="text-right shrink-0">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                    {item.subtasks[0]?.status === 'completed' ? 'CFO Review Pending' : 'Collation in Progress'}
-                  </span>
+              return (
+                <div 
+                  key={item.id} 
+                  className={`rounded-xl border py-2 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors cursor-pointer ${rowClasses}`}
+                  onClick={() => setActiveTab('compliances')}
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-slate-200/70 text-slate-700 leading-none">
+                        {item.category}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900 leading-tight">{item.name}</span>
+                    </div>
+                    <div className="text-[10.5px] text-slate-500 flex items-center gap-2 flex-wrap leading-tight">
+                      <DueDateBadge item={item} compact={true} />
+                      {item.taxAmount ? <span>• Est. Tax: {formatLakhs(item.taxAmount)}</span> : null}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    <ComplianceSubtaskProgressIcons compliance={item} compact={true} />
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Priority Operational Tasks */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-sky-600" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Priority Operational Tasks
+                </h3>
+                <p className="text-[11px] text-slate-500">{openActions.length} pending deliverables</p>
               </div>
-            ))}
+            </div>
+            <button
+              onClick={() => setActiveTab('actions')}
+              className="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 cursor-pointer"
+            >
+              <span>View All Tasks ({actions.length})</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {topActiveActions.slice(0, 3).map((act) => {
+              const actStatus = getActionFourColorStatus(act);
+              const rowClasses = getLineItemRowClasses(actStatus);
+
+              return (
+                <div 
+                  key={act.id} 
+                  className={`py-2 px-3 rounded-xl border transition-colors space-y-1.5 cursor-pointer ${rowClasses}`}
+                  onClick={() => setActiveTab('actions')}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
+                      act.priority === 'Urgent' 
+                        ? 'bg-rose-100 text-rose-800' 
+                        : act.priority === 'High'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {act.priority}
+                    </span>
+                    <span className="text-[10.5px] font-semibold text-slate-500">
+                      Due: <strong className="text-slate-800">{act.fixedDeadline.split(' ')[0]}</strong>
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-xs text-slate-900 leading-tight">{act.title}</h4>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1 border-t border-slate-200/50">
+                    <span className="text-[10.5px] text-slate-600">Assignee: <strong className="text-slate-800">{act.assignedTo}</strong></span>
+                    <ActionSubtaskProgressIcons action={act} compact={true} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* BROAD PICTURE 3: OPERATIONAL ACTION ITEMS STATUS */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-sky-600" />
-              Broad Picture: Operational Action Items & Internal Deliverables
-            </h2>
-            <p className="text-xs text-slate-500">
-              Internal tasks handled by the finance, accounting, and compliance team to keep books audit-ready
+      {/* CFO STRATEGIC ADVISORY COMMENTARY */}
+      <div className="bg-slate-50/80 rounded-2xl border border-slate-200 p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 shrink-0 mt-0.5">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div className="space-y-2 flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Virtual CFO Strategic Advisory • {clientProfile.cfoName} ({clientProfile.cfoFirm})
+              </h3>
+              <span className="text-[11px] text-slate-500 font-medium">August 2026 Audit Ready Close</span>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed italic bg-white p-3.5 rounded-xl border border-slate-200">
+              "{financialMIS.cfoExecutiveSummary}"
             </p>
-          </div>
-          <button
-            onClick={() => setActiveTab('actions')}
-            className="text-xs font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1 cursor-pointer"
-          >
-            <span>View All Action Items ({actions.length})</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Action Priority Quick Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="text-xs text-slate-500 font-medium">Total Action Items</span>
-            <p className="text-xl font-bold text-slate-900 mt-1">{actions.length} Tasks</p>
-          </div>
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="text-xs text-slate-500 font-medium">Open & In-Progress</span>
-            <p className="text-xl font-bold text-blue-700 mt-1">{openActions.length} Pending</p>
-          </div>
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="text-xs text-slate-500 font-medium">Overdue Deadlines</span>
-            <p className={`text-xl font-bold mt-1 ${overdueActions.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-              {overdueActions.length} Overdue
-            </p>
-          </div>
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="text-xs text-slate-500 font-medium">Completed this Cycle</span>
-            <p className="text-xl font-bold text-emerald-700 mt-1">{stats.completedActions} Completed</p>
           </div>
         </div>
 
-        {/* Top Active Operational Pendencies */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {topActiveActions.map((act) => (
-            <div 
-              key={act.id} 
-              className="p-4 rounded-xl border border-slate-200 bg-white hover:border-sky-300 transition-colors space-y-2 cursor-pointer"
-              onClick={() => setActiveTab('actions')}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  act.priority === 'Urgent' 
-                    ? 'bg-rose-100 text-rose-800' 
-                    : act.priority === 'High'
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-slate-100 text-slate-700'
-                }`}>
-                  {act.priority} Priority
-                </span>
-                <span className="text-[11px] font-bold text-blue-700">
-                  {act.status}
-                </span>
-              </div>
-
-              <h4 className="font-bold text-xs text-slate-900">{act.title}</h4>
-              <p className="text-[11px] text-slate-500 line-clamp-2">{act.description}</p>
-
-              <div className="pt-2 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100">
-                <span>Assignee: <strong className="text-slate-700">{act.assignedTo}</strong> ({act.assignedRole || 'Finance Team'})</span>
-                <span>Due: <strong className="text-slate-800">{act.fixedDeadline.split(' ')[0]}</strong></span>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+          {financialMIS.cfoKeyAlerts.map((alert, idx) => (
+            <div key={idx} className="flex items-start gap-2 text-xs bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-amber-900">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>{alert}</span>
             </div>
           ))}
         </div>

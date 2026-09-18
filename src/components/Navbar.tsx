@@ -15,7 +15,6 @@ import {
   LogIn,
   ChevronDown,
   Layers,
-  ReceiptText,
   Calculator
 } from 'lucide-react';
 
@@ -27,7 +26,6 @@ export const Navbar: React.FC = () => {
     setActiveTab, 
     clientProfile, 
     stats, 
-    invoiceStats,
     resetToDefaultData,
     currentUser,
     setIsAuthModalOpen,
@@ -251,7 +249,7 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
-            {/* Financial MIS - Hidden for Client Team, Available for Client & CFO */}
+            {/* Financial MIS - Encompassing Statements, Working Capital & Budget/Variance */}
             {role !== 'client_team' && (
               <button
                 id="nav-tab-mis"
@@ -264,60 +262,11 @@ export const Navbar: React.FC = () => {
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 <span>Financial MIS</span>
-              </button>
-            )}
-
-            {/* Complete Budget & Variance Analysis - Hidden for Client Team, Available for Client & CFO */}
-            {role !== 'client_team' && (
-              <button
-                id="nav-tab-budget"
-                onClick={() => setActiveTab('budget')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                  activeTab === 'budget'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <Calculator className="w-3.5 h-3.5" />
-                <span>Budget & Variance</span>
-                <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                  activeTab === 'budget' 
-                    ? 'bg-amber-400 text-slate-950' 
-                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                  activeTab === 'mis' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
                 }`}>
-                  ±5% Alerts
+                  MIS & Budget
                 </span>
-              </button>
-            )}
-
-            {/* Invoice Tracking - Hidden for Client Team, Available for Client & CFO */}
-            {role !== 'client_team' && (
-              <button
-                id="nav-tab-invoices"
-                onClick={() => setActiveTab('invoices')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                  activeTab === 'invoices'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <ReceiptText className="w-3.5 h-3.5" />
-                <span>Invoice Tracking</span>
-                {invoiceStats.critical > 0 ? (
-                  <span 
-                    className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse flex items-center gap-0.5" 
-                    title={`${invoiceStats.critical} invoices pending >2 days (SLA Breached)`}
-                  >
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-white"></span>
-                    {invoiceStats.critical} Critical
-                  </span>
-                ) : (
-                  <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
-                    activeTab === 'invoices' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
-                  }`}>
-                    {invoiceStats.total}
-                  </span>
-                )}
               </button>
             )}
           </nav>
@@ -325,15 +274,15 @@ export const Navbar: React.FC = () => {
           <div className="hidden lg:flex items-center gap-2 text-xs text-slate-500">
             {role === 'client_team' ? (
               <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
-                Operational Access: Compliance Master & Action Items
+                Client Team
               </span>
             ) : role === 'client' ? (
               <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Client Executive View (Full Access Excl. CFO Dashboard)
+                Client Executive
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Virtual CFO Master Control (All Tabs & All Companies)
+                Virtual CFO
               </span>
             )}
             <span className="font-semibold text-slate-800 ml-1">

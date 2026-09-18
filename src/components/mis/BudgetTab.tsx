@@ -14,6 +14,7 @@ import {
 } from '../../data/mockBudgetData';
 import { ExcelUploadBudgetModal } from './ExcelUploadBudgetModal';
 import { exportVarianceReportExcel, generateBudgetTemplateExcel } from '../../utils/excelBudgetHelper';
+import { formatINR, formatVariance, formatPercent } from '../../utils/format';
 import { 
   Calculator, 
   Upload, 
@@ -513,14 +514,14 @@ export const BudgetTab: React.FC = () => {
                     <div className="text-right">
                       <span className="text-[10px] text-white/60 block">Budget</span>
                       <span className="font-bold text-white">
-                        ₹{catSummary.budget.toLocaleString('en-IN')}
+                        {formatINR(catSummary.budget)}
                       </span>
                     </div>
 
                     <div className="text-right">
                       <span className="text-[10px] text-white/60 block">Actual</span>
                       <span className="font-bold text-white">
-                        ₹{catSummary.actual.toLocaleString('en-IN')}
+                        {formatINR(catSummary.actual)}
                       </span>
                     </div>
 
@@ -531,7 +532,7 @@ export const BudgetTab: React.FC = () => {
                           ? (catSummary.varianceAmount >= 0 ? 'text-emerald-300' : 'text-rose-300')
                           : (catSummary.varianceAmount <= 0 ? 'text-emerald-300' : 'text-rose-300')
                       }`}>
-                        {catSummary.varianceAmount >= 0 ? '+' : ''}₹{catSummary.varianceAmount.toLocaleString('en-IN')} ({catSummary.variancePercent.toFixed(1)}%)
+                        {formatVariance(catSummary.varianceAmount, catSummary.variancePercent)}
                       </span>
                     </div>
 
@@ -639,7 +640,7 @@ export const BudgetTab: React.FC = () => {
                                   className="cursor-pointer hover:text-indigo-600 hover:underline flex items-center justify-end gap-1 group/btn"
                                   title="Click to edit budget figure"
                                 >
-                                  <span>₹{vr.budget.toLocaleString('en-IN')}</span>
+                                  <span>{formatINR(vr.budget)}</span>
                                   <Edit3 className="w-2.5 h-2.5 opacity-0 group-hover/btn:opacity-100 text-slate-400" />
                                 </div>
                               )}
@@ -670,7 +671,7 @@ export const BudgetTab: React.FC = () => {
                                   className="cursor-pointer hover:text-indigo-600 hover:underline flex items-center justify-end gap-1 group/btn"
                                   title="Click to edit actual figure or upload via Excel"
                                 >
-                                  <span>₹{vr.actual.toLocaleString('en-IN')}</span>
+                                  <span>{formatINR(vr.actual)}</span>
                                   <Edit3 className="w-2.5 h-2.5 opacity-0 group-hover/btn:opacity-100 text-slate-400" />
                                 </div>
                               )}
@@ -684,7 +685,7 @@ export const BudgetTab: React.FC = () => {
                                 ? 'text-emerald-600'
                                 : 'text-slate-600'
                             }`}>
-                              {vr.varianceAmount >= 0 ? '+' : ''}₹{vr.varianceAmount.toLocaleString('en-IN')}
+                              {formatVariance(vr.varianceAmount)}
                             </td>
 
                             {/* Variance % */}
@@ -745,17 +746,17 @@ export const BudgetTab: React.FC = () => {
                           Total {catMeta.shortName} ({activeMonthMeta.label})
                         </td>
                         <td className="py-3 px-4 text-right font-mono">
-                          ₹{catSummary.budget.toLocaleString('en-IN')}
+                          {formatINR(catSummary.budget)}
                         </td>
                         <td className="py-3 px-4 text-right font-mono">
-                          ₹{catSummary.actual.toLocaleString('en-IN')}
+                          {formatINR(catSummary.actual)}
                         </td>
                         <td className={`py-3 px-4 text-right font-mono ${
                           cat === 'sales'
                             ? (catSummary.varianceAmount >= 0 ? 'text-emerald-700' : 'text-rose-700')
                             : (catSummary.varianceAmount <= 0 ? 'text-emerald-700' : 'text-rose-700')
                         }`}>
-                          {catSummary.varianceAmount >= 0 ? '+' : ''}₹{catSummary.varianceAmount.toLocaleString('en-IN')}
+                          {formatVariance(catSummary.varianceAmount)}
                         </td>
                         <td className={`py-3 px-4 text-right font-mono ${
                           cat === 'sales'
@@ -811,12 +812,12 @@ export const BudgetTab: React.FC = () => {
               <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700">
                 <span className="text-xs font-semibold text-slate-400 block">Gross Profit (Sales - Direct Cost)</span>
                 <div className="text-lg font-black text-white font-mono mt-1">
-                  ₹{monthSummary.grossProfitActual.toLocaleString('en-IN')}
+                  {formatINR(monthSummary.grossProfitActual)}
                 </div>
                 <div className="flex items-center justify-between text-xs mt-2 text-slate-300">
-                  <span>Budget: ₹{monthSummary.grossProfitBudget.toLocaleString('en-IN')}</span>
+                  <span>Budget: {formatINR(monthSummary.grossProfitBudget)}</span>
                   <span className={monthSummary.grossProfitVariance >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                    {monthSummary.grossProfitVariance >= 0 ? '+' : ''}₹{monthSummary.grossProfitVariance.toLocaleString('en-IN')}
+                    {formatVariance(monthSummary.grossProfitVariance)}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
@@ -828,12 +829,12 @@ export const BudgetTab: React.FC = () => {
               <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700">
                 <span className="text-xs font-semibold text-slate-400 block">Total Expenses (Opex + Direct Cost)</span>
                 <div className="text-lg font-black text-white font-mono mt-1">
-                  ₹{monthSummary.totalExpensesActual.toLocaleString('en-IN')}
+                  {formatINR(monthSummary.totalExpensesActual)}
                 </div>
                 <div className="flex items-center justify-between text-xs mt-2 text-slate-300">
-                  <span>Budget: ₹{monthSummary.totalExpensesBudget.toLocaleString('en-IN')}</span>
+                  <span>Budget: {formatINR(monthSummary.totalExpensesBudget)}</span>
                   <span className={monthSummary.totalExpensesVariance <= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                    {monthSummary.totalExpensesVariance > 0 ? '+' : ''}₹{monthSummary.totalExpensesVariance.toLocaleString('en-IN')}
+                    {formatVariance(monthSummary.totalExpensesVariance)}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
@@ -845,12 +846,12 @@ export const BudgetTab: React.FC = () => {
               <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700">
                 <span className="text-xs font-semibold text-slate-400 block">Operating Surplus / EBITDA</span>
                 <div className="text-lg font-black text-white font-mono mt-1">
-                  ₹{monthSummary.ebitdaActual.toLocaleString('en-IN')}
+                  {formatINR(monthSummary.ebitdaActual)}
                 </div>
                 <div className="flex items-center justify-between text-xs mt-2 text-slate-300">
-                  <span>Budget: ₹{monthSummary.ebitdaBudget.toLocaleString('en-IN')}</span>
+                  <span>Budget: {formatINR(monthSummary.ebitdaBudget)}</span>
                   <span className={monthSummary.ebitdaVariance >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                    {monthSummary.ebitdaVariance >= 0 ? '+' : ''}₹{monthSummary.ebitdaVariance.toLocaleString('en-IN')}
+                    {formatVariance(monthSummary.ebitdaVariance)}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">

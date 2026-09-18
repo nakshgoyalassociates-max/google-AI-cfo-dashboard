@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ProgressBar } from '../common/ProgressBar';
+import { DueDateBadge } from '../common/DueDateBadge';
 import { ComplianceInlineDetail } from '../common/ComplianceInlineDetail';
+import { ComplianceSubtaskProgressIcons } from '../common/ComplianceSubtaskProgressIcons';
+import { 
+  getComplianceFourColorStatus, 
+  getLineItemRowClasses 
+} from '../../utils/statusColors';
 import { 
   Search, 
   Filter, 
@@ -75,10 +81,11 @@ export const ComplianceMasterTab: React.FC = () => {
     if (selectedCategory !== 'ALL' && c.category !== selectedCategory) return false;
     if (selectedFrequency !== 'ALL' && c.frequency !== selectedFrequency) return false;
 
-    const doneCount = subtasks.filter(s => s && s.status === 'completed').length;
-    if (selectedStatus === 'COMPLETED' && doneCount !== 3) return false;
-    if (selectedStatus === 'IN_PROGRESS' && (doneCount === 0 || doneCount === 3)) return false;
-    if (selectedStatus === 'NOT_STARTED' && doneCount !== 0) return false;
+    const itemStatus = getComplianceFourColorStatus(c);
+    if (selectedStatus === 'COMPLETED' && itemStatus !== 'completed') return false;
+    if (selectedStatus === 'IN_PROGRESS' && itemStatus !== 'in_process') return false;
+    if (selectedStatus === 'OVERDUE' && itemStatus !== 'overdue') return false;
+    if (selectedStatus === 'NOT_DUE' && itemStatus !== 'not_due') return false;
     if (selectedStatus === 'CFO_PENDING' && !(subtasks[0]?.status === 'completed' && subtasks[1]?.status === 'pending')) return false;
 
     return true;
@@ -137,39 +144,51 @@ export const ComplianceMasterTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Status Strip */}
-      <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-lg border border-slate-200 text-xs text-slate-600 shadow-2xs flex-wrap gap-2">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span>Total Records: <strong className="text-slate-900 font-semibold">{(compliances || []).length}</strong></span>
-          <span className="text-slate-300">|</span>
-          <span>Filed & Complete: <strong className="text-emerald-700 font-semibold">{(compliances || []).filter(c => c?.subtasks && c.subtasks.every(s => s && s.status === 'completed')).length}</strong></span>
-          <span className="text-slate-300">|</span>
-          <span>In Progress: <strong className="text-indigo-700 font-semibold">{(compliances || []).filter(c => c?.subtasks && c.subtasks.some(s => s && s.status === 'completed') && !c.subtasks.every(s => s && s.status === 'completed')).length}</strong></span>
-          <span className="text-slate-300">|</span>
-          <span>Not Started: <strong className="text-amber-700 font-semibold">{(compliances || []).filter(c => c?.subtasks && c.subtasks.every(s => s && s.status === 'pending')).length}</strong></span>
-        </div>
+      {/* Metrics Summary Bar */}
+      <div className="bg-white rounded-lg border border-slate-200 p-2.5 shadow-2xs">
+        <div className="flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span>Total: <strong className="text-slate-900 font-semibold">{(compliances || []).length}</strong></span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-700">
+              Completed: <strong className="text-slate-900 font-semibold">{(compliances || []).filter(c => getComplianceFourColorStatus(c) === 'completed').length}</strong>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-700">
+              In Process: <strong className="text-slate-900 font-semibold">{(compliances || []).filter(c => getComplianceFourColorStatus(c) === 'in_process').length}</strong>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-700">
+              Overdue: <strong className="text-slate-900 font-semibold">{(compliances || []).filter(c => getComplianceFourColorStatus(c) === 'overdue').length}</strong>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-600">
+              Not Due Currently: <strong className="text-slate-900 font-semibold">{(compliances || []).filter(c => getComplianceFourColorStatus(c) === 'not_due').length}</strong>
+            </span>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={expandAll}
-            className="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-1 rounded hover:bg-slate-100 cursor-pointer flex items-center gap-1"
-          >
-            <Maximize2 className="w-3 h-3 text-slate-500" />
-            <span>Expand All</span>
-          </button>
-          <span className="text-slate-300">•</span>
-          <button
-            onClick={collapseAll}
-            className="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-1 rounded hover:bg-slate-100 cursor-pointer flex items-center gap-1"
-          >
-            <Minimize2 className="w-3 h-3 text-slate-500" />
-            <span>Collapse</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={expandAll}
+              className="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-0.5 rounded hover:bg-slate-100 cursor-pointer flex items-center gap-1"
+            >
+              <Maximize2 className="w-3 h-3 text-slate-500" />
+              <span>Expand All</span>
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              onClick={collapseAll}
+              className="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-0.5 rounded hover:bg-slate-100 cursor-pointer flex items-center gap-1"
+            >
+              <Minimize2 className="w-3 h-3 text-slate-500" />
+              <span>Collapse</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-2xs">
+      <div className="bg-white rounded-lg border border-slate-200 p-2.5 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
           {/* Search box */}
           <div className="relative flex-1 max-w-md">
@@ -179,7 +198,7 @@ export const ComplianceMasterTab: React.FC = () => {
               placeholder="Search by form name, category, or reference..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-slate-400 focus:outline-hidden"
+              className="w-full pl-8 pr-3 py-1 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-slate-400 focus:outline-hidden"
             />
           </div>
 
@@ -188,7 +207,7 @@ export const ComplianceMasterTab: React.FC = () => {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-xs bg-white text-slate-700"
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs bg-white text-slate-700"
             >
               <option value="ALL">All Categories (6)</option>
               <option value="GST">GST</option>
@@ -202,19 +221,20 @@ export const ComplianceMasterTab: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-xs bg-white text-slate-700"
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs bg-white text-slate-700 font-medium"
             >
               <option value="ALL">All Statuses</option>
-              <option value="COMPLETED">Completed (3/3)</option>
-              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">🟢 Green: Completed (All 3 Filed)</option>
+              <option value="IN_PROGRESS">🟠 Orange: In Process</option>
+              <option value="OVERDUE">🔴 Red: Overdue</option>
+              <option value="NOT_DUE">⚪ Without Colour: Not Due Currently</option>
               <option value="CFO_PENDING">Awaiting CFO Review</option>
-              <option value="NOT_STARTED">Not Started</option>
             </select>
 
             <select
               value={selectedFrequency}
               onChange={(e) => setSelectedFrequency(e.target.value)}
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-xs bg-white text-slate-700"
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs bg-white text-slate-700"
             >
               <option value="ALL">All Frequencies</option>
               <option value="Monthly">Monthly</option>
@@ -227,94 +247,89 @@ export const ComplianceMasterTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Compliance Master Table with Inline Subtask Expanders */}
+      {/* Compliance Master Table with Inline Subtask Expanders (Compact ~70% Height) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase tracking-wider text-[10px] font-bold">
               <tr>
-                <th className="px-3 py-3 w-12 text-center">S.No</th>
-                <th className="px-4 py-3 min-w-[240px]">Compliance / Form</th>
-                <th className="px-3 py-3">Frequency & Due Date</th>
-                <th className="px-4 py-3 min-w-[150px]">Progress</th>
-                <th className="px-3 py-3 min-w-[120px]">Remarks</th>
+                <th className="px-2.5 py-1.5 w-10 text-center">S.No</th>
+                <th className="px-3 py-1.5 min-w-[220px]">Compliance / Form</th>
+                <th className="px-2.5 py-1.5">Frequency & Due Date</th>
+                <th className="px-3 py-1.5 min-w-[240px]">Subtasks & Bottleneck (Where Stuck)</th>
+                <th className="px-2.5 py-1.5 min-w-[110px]">Remarks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filtered.map((comp) => {
                 const isExpanded = expandedIds.has(comp.id);
+                const rowStatus = getComplianceFourColorStatus(comp);
+                const rowClasses = getLineItemRowClasses(rowStatus, isExpanded);
 
                 return (
                   <React.Fragment key={comp.id}>
-                    {/* Primary Row */}
+                    {/* Primary 4-Colour Row with Compact 70% Height */}
                     <tr 
                       onClick={() => toggleExpand(comp.id)}
-                      className={`hover:bg-indigo-50/30 transition-colors cursor-pointer group ${
-                        isExpanded ? 'bg-indigo-50/20' : ''
-                      }`}
+                      className={`${rowClasses} transition-colors cursor-pointer group`}
                     >
                       {/* S.No */}
-                      <td className="px-3 py-3 text-center font-mono font-bold text-slate-400">
+                      <td className="px-2.5 py-1.5 text-center font-mono font-bold text-slate-400">
                         {comp.sNo}
                       </td>
 
                       {/* Compliance / Form Name */}
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-1.5">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight">
                               {comp.name}
                             </span>
                             {comp.arnOrChallanNo && (
-                              <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-semibold">
+                              <span className="text-[9.5px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-normal leading-none">
                                 Filed ✓
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 line-clamp-1">
+                          <p className="text-[10px] text-slate-500 line-clamp-1 leading-tight">
                             {comp.applicability}
                           </p>
                         </div>
                       </td>
 
                       {/* Frequency & Statutory Due Date */}
-                      <td className="px-3 py-3 whitespace-nowrap space-y-0.5">
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded block w-fit">
-                          {comp.frequency}
-                        </span>
-                        <p className="text-[11px] text-slate-700 font-medium max-w-[170px] leading-tight">
-                          {comp.statutoryDueDate.split(';')[0]}
-                        </p>
-                      </td>
-
-                      {/* Progressive graph line with colour indication only */}
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="min-w-[130px]">
-                          <ProgressBar
-                            subtasks={comp.subtasks}
-                            size="sm"
-                          />
+                      <td className="px-2.5 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1 py-0.2 rounded">
+                            {comp.frequency}
+                          </span>
+                          <DueDateBadge item={comp} compact={true} showPrefix={false} />
                         </div>
                       </td>
 
+                      {/* Small icons of each subtask indicating where task is stuck */}
+                      <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+                        <ComplianceSubtaskProgressIcons compliance={comp} compact={false} />
+                      </td>
+
                       {/* Remarks Presence Indicator */}
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {comp.cfoRemarks && (
                             <span 
                               title={`CFO: ${comp.cfoRemarks}`}
-                              className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1"
+                              className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1"
                             >
-                              <ShieldCheck className="w-3 h-3" />
+                              <ShieldCheck className="w-2.5 h-2.5" />
                               <span>CFO</span>
                             </span>
                           )}
                           {comp.clientRemarks && (
                             <span 
                               title={`Client: ${comp.clientRemarks}`}
-                              className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                              className="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
                             >
-                              <Building className="w-3 h-3" />
+                              <Building className="w-2.5 h-2.5" />
                               <span>Client</span>
                             </span>
                           )}
@@ -327,8 +342,8 @@ export const ComplianceMasterTab: React.FC = () => {
 
                     {/* INLINE EXPANDED VIEW: Directly below clicked compliance row */}
                     {isExpanded && (
-                      <tr className="bg-slate-50/90 border-b border-indigo-200">
-                        <td colSpan={5} className="px-4 py-3">
+                      <tr className="bg-indigo-50/25 border-y-2 border-indigo-200">
+                        <td colSpan={5} className="px-3 py-2 sm:px-4">
                           <ComplianceInlineDetail
                             compliance={comp}
                             onClose={() => toggleExpand(comp.id)}

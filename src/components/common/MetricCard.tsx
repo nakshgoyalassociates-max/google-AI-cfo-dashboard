@@ -79,23 +79,25 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       </div>
 
       {(subtitle || badgeObj || trend) && (
-        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-          {subtitle && (
-            <span className="text-slate-500 font-medium truncate max-w-[200px]" title={subtitle}>
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+          {subtitle ? (
+            <span className="text-slate-500 font-medium truncate" title={subtitle}>
               {subtitle}
             </span>
-          )}
-          {badgeObj && (
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getBadgeStyle()}`}>
-              {badgeObj.text}
-            </span>
-          )}
-          {trend && (
-            <span className={`font-semibold flex items-center gap-0.5 ${trend.isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {trend.value}
-              {trend.label && <span className="text-slate-400 font-normal ml-1">{trend.label}</span>}
-            </span>
-          )}
+          ) : <span />}
+          <div className="flex items-center gap-2 shrink-0">
+            {trend && (
+              <span className={`font-semibold flex items-center gap-0.5 ${trend.isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {trend.value}
+                {trend.label && <span className="text-slate-400 font-normal ml-1">{trend.label}</span>}
+              </span>
+            )}
+            {badgeObj && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getBadgeStyle()}`}>
+                {badgeObj.text}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

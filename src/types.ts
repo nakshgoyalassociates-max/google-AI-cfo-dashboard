@@ -45,6 +45,7 @@ export interface ComplianceItem {
   applicability: string;
   frequency: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Annual' | 'Event-based' | 'Ongoing / Transaction-based';
   statutoryDueDate: string;
+  dueDates: string[]; // ISO YYYY-MM-DD, one entry per applicable due date
   type: 'Return' | 'Payment' | 'Return + Payment' | 'Payment + Return' | 'Filing' | 'Certification' | 'Application' | 'Audit Report' | 'Certificate' | 'Governance' | 'Ongoing Monitoring' | 'Renewal';
   penaltyClause: string;
   subtasks: [SubTask, SubTask, SubTask];
@@ -326,6 +327,15 @@ export interface FinancialMIS {
   fundFlow?: FundFlowData;
 }
 
+export type MisSubTab = 
+  | 'overview' 
+  | 'balance-sheet' 
+  | 'pnl' 
+  | 'debtor-ageing' 
+  | 'fund-flow' 
+  | 'budget' 
+  | 'all';
+
 export interface FilterOptions {
   category: string;
   status: string;
@@ -367,7 +377,7 @@ export interface CompanyOverviewSummary {
 
 export interface CriticalDelayedItem {
   id: string;
-  type: 'compliance' | 'action' | 'invoice';
+  type: 'compliance' | 'action';
   companyId: string;
   companyName: string;
   title: string;
@@ -379,111 +389,7 @@ export interface CriticalDelayedItem {
   financialAmount?: number;
   stageInfo?: string;
   cfoReviewPending?: boolean;
-}
-
-export type InvoiceCategory = 
-  | 'Fabric'
-  | 'Job Work External'
-  | 'Job Work Internal'
-  | 'Admin / Utility';
-
-export type InvoiceStage = 
-  | 'guard'             // 1. Receipt by Guard / Gatekeeper
-  | 'grn_qc'            // 2. GRN & Quality Check Dept
-  | 'erp'               // 3. ERP Person (SAP/Tally/Matching)
-  | 'account_head'      // 4. Account Head Approval
-  | 'accounts_booking'  // 5. In Accounts for Booking
-  | 'booked';           // Completed & Booked in Ledger
-
-export type SlaStatus = 'on_track' | 'warning' | 'critical';
-
-export interface InvoiceHistoryEvent {
-  id: string;
-  stage: InvoiceStage;
-  stageTitle: string;
-  action: string;
-  actorName: string;
-  actorRole: string;
-  timestamp: string;
-  daysSpent: number;
-  notes?: string;
-}
-
-export interface TrackedInvoice {
-  id: string;
-  companyId: string;
-  companyName?: string;
-  gateEntryNo: string;
-  
-  // Basic AI Extracted & Verified Data
-  vendorName: string;
-  invoiceNumber: string;
-  invoiceDate: string;
-  taxableValue: number;
-  taxAmount: number;
-  totalAmount: number;
-  gstin?: string;
-  poNumber?: string;
-  category: InvoiceCategory | string; // Fabric, Job Work External, Job Work Internal, Admin / Utility
-  
-  // Image & Guard Data
-  invoiceImageUrl?: string;
-  guardName: string;
-  receivedAt: string; // ISO string
-  vehicleOrChallanNo?: string;
-  guardRemarks?: string;
-  aiExtracted?: boolean;
-  aiConfidence?: number;
-
-  // Pipeline & SLA State
-  currentStage: InvoiceStage;
-  stageEnteredAt: string; // ISO string
-  daysInCurrentStage: number;
-  slaStatus: SlaStatus;
-  isCritical: boolean; // true if > 2 days in current stage
-  criticalReason?: string;
-
-  // Departmental Stage Progress Data
-  grnDetails?: {
-    grnNumber: string;
-    grnDate: string;
-    qcInspectorName: string;
-    qcStatus: 'Approved' | 'Rejected' | 'Partially Accepted' | 'Pending Inspection';
-    acceptedQuantity?: string;
-    rejectedQuantity?: string;
-    qcRemarks?: string;
-    completedAt?: string;
-  };
-
-  erpDetails?: {
-    erpVoucherNo: string;
-    erpOperatorName: string;
-    matchingStatus: '3-Way Matched' | 'Price Variance' | 'Qty Variance' | 'Pending';
-    tdsRateApplicable?: string;
-    hsnSacCode?: string;
-    erpEnteredAt?: string;
-    erpRemarks?: string;
-  };
-
-  accountHeadDetails?: {
-    accountHeadName: string;
-    approvalStatus: 'Approved' | 'Query Raised' | 'Rejected' | 'Pending';
-    paymentTerms: string; // e.g. "Immediate", "30 Days Net", "45 Days MSME Priority"
-    approvedAt?: string;
-    approvalRemarks?: string;
-  };
-
-  bookingDetails?: {
-    bookedBy: string;
-    voucherNumber: string;
-    financialLedger: string;
-    scheduledPaymentDate?: string;
-    paymentStatus: 'Booked' | 'Scheduled for Payment' | 'Paid';
-    bookedAt?: string;
-    bookingRemarks?: string;
-  };
-
-  history: InvoiceHistoryEvent[];
+  rawDueDate?: string;
 }
 
 // ==========================================

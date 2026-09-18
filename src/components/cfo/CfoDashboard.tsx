@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MetricCard } from '../common/MetricCard';
+import { DueDateBadge } from '../common/DueDateBadge';
+import { compareDueDates } from '../../utils/dueDate';
+import { formatINR, formatLakhs, formatCrores } from '../../utils/format';
 import { ProgressBar } from '../common/ProgressBar';
 import { ComplianceInlineDetail } from '../common/ComplianceInlineDetail';
 import { PortfolioOverview } from './PortfolioOverview';
@@ -55,10 +58,10 @@ export const CfoDashboard: React.FC = () => {
     c => c?.subtasks && c.subtasks[0]?.status === 'completed' && c.subtasks[1]?.status === 'pending'
   );
 
-  // Critical items approaching deadline
+  // Critical items approaching deadline (sorted by nextDueDate ascending)
   const criticalUpcoming = (compliances || []).filter(
     c => c?.criticality === 'Critical' && c.subtasks && c.subtasks[2]?.status !== 'completed'
-  );
+  ).sort(compareDueDates);
 
   // Category stats
   const categories = [
@@ -194,8 +197,8 @@ export const CfoDashboard: React.FC = () => {
 
         <MetricCard
           title="Cash in Bank & Runway"
-          value={`₹${(financialMIS.cashAndBankBalance / 10000000).toFixed(2)} Cr`}
-          subtitle={`${financialMIS.cashRunwayMonths} Months Runway (Burn ₹${(financialMIS.monthlyBurnRate / 100000).toFixed(1)}L)`}
+          value={formatCrores(financialMIS.cashAndBankBalance)}
+          subtitle={`${financialMIS.cashRunwayMonths} Months Runway (Burn ${formatLakhs(financialMIS.monthlyBurnRate, 1)})`}
           icon={IndianRupee}
           badge={{
             text: financialMIS.cashRunwayMonths >= 6 ? 'Healthy Runway' : 'Watch Runway',
@@ -262,9 +265,7 @@ export const CfoDashboard: React.FC = () => {
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                           {comp.category}
                         </span>
-                        <span className="text-xs font-semibold text-slate-500">
-                          Due: {comp.statutoryDueDate.split(';')[0]}
-                        </span>
+                        <DueDateBadge item={comp} />
                       </div>
                       <h3 className="text-sm font-bold text-slate-900 mt-1">
                         {comp.name}
@@ -274,7 +275,7 @@ export const CfoDashboard: React.FC = () => {
                       <div className="text-right">
                         <span className="text-[10px] text-slate-400 uppercase font-semibold">Tax Liability</span>
                         <p className="text-xs font-bold text-slate-900 font-mono">
-                          ₹{comp.taxAmount.toLocaleString('en-IN')}
+                          {formatINR(comp.taxAmount)}
                         </p>
                       </div>
                     )}
@@ -400,7 +401,9 @@ export const CfoDashboard: React.FC = () => {
                               {isItemExpanded ? '▲' : '▼'}
                             </span>
                           </p>
-                          <p className="text-[10px] text-slate-400">Due: {item.statutoryDueDate.split('(')[0]}</p>
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            <DueDateBadge item={item} compact={true} />
+                          </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
@@ -465,9 +468,7 @@ export const CfoDashboard: React.FC = () => {
                       </span>
                       <h3 className="font-bold text-slate-900 mt-1">{item.name}</h3>
                     </div>
-                    <span className="font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 text-[11px]">
-                      Due: {item.statutoryDueDate.split(';')[0]}
-                    </span>
+                    <DueDateBadge item={item} />
                   </div>
 
                   <ProgressBar 

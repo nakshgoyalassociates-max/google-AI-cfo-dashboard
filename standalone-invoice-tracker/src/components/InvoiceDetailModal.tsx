@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
-import { TrackedInvoice, InvoiceStage } from '../../types';
+import { TrackedInvoice, InvoiceStage } from '../types';
 import { getCategoryStyle } from './InvoiceTrackingTab';
 import { 
   X, 

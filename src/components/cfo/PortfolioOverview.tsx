@@ -23,6 +23,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ProgressBar } from '../common/ProgressBar';
+import { formatINR, formatLakhs, formatCrores } from '../../utils/format';
 
 export const PortfolioOverview: React.FC = () => {
   const { 
@@ -34,7 +35,7 @@ export const PortfolioOverview: React.FC = () => {
     switchCompanyAndTab
   } = useApp();
 
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'compliance' | 'action' | 'invoice'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'compliance' | 'action'>('ALL');
 
   // Aggregate stats across all companies
   const totalCompanies = allCompaniesOverview.length;
@@ -53,7 +54,6 @@ export const PortfolioOverview: React.FC = () => {
 
   const complianceCritCount = criticalDelayedItems.filter(i => i.type === 'compliance').length;
   const actionCritCount = criticalDelayedItems.filter(i => i.type === 'action').length;
-  const invoiceCritCount = criticalDelayedItems.filter(i => i.type === 'invoice').length;
 
   return (
     <div className="space-y-6">
@@ -143,11 +143,11 @@ export const PortfolioOverview: React.FC = () => {
             <IndianRupee className="w-4 h-4 text-slate-400" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">₹{(totalRevenue / 10000000).toFixed(2)} Cr</span>
+            <span className="text-2xl font-bold text-slate-900">{formatCrores(totalRevenue)}</span>
             <span className="text-xs text-slate-500">/ month</span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
-            ₹{(totalTaxQueued / 100000).toFixed(2)}L tax queued for payment
+            {formatLakhs(totalTaxQueued)} tax queued for payment
           </p>
         </div>
 
@@ -206,16 +206,6 @@ export const PortfolioOverview: React.FC = () => {
             >
               Action Items ({actionCritCount})
             </button>
-            <button
-              onClick={() => setActiveFilter('invoice')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeFilter === 'invoice'
-                  ? 'bg-rose-700 text-white shadow-xs'
-                  : 'bg-white border border-rose-200 text-rose-800 hover:bg-rose-100'
-              }`}
-            >
-              Invoice SLAs ({invoiceCritCount})
-            </button>
           </div>
         </div>
 
@@ -224,7 +214,6 @@ export const PortfolioOverview: React.FC = () => {
           {filteredCriticalItems.map((item) => {
             const isCompliance = item.type === 'compliance';
             const isAction = item.type === 'action';
-            const isInvoice = item.type === 'invoice';
 
             return (
               <div 
@@ -276,7 +265,7 @@ export const PortfolioOverview: React.FC = () => {
                     {item.financialAmount && (
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Value at Stake:</span>
-                        <span className="font-bold text-slate-900">₹{item.financialAmount.toLocaleString('en-IN')}</span>
+                        <span className="font-bold text-slate-900">{formatINR(item.financialAmount)}</span>
                       </div>
                     )}
                   </div>
@@ -306,10 +295,8 @@ export const PortfolioOverview: React.FC = () => {
                     onClick={() => {
                       if (isCompliance) {
                         switchCompanyAndTab(item.companyId, 'compliances');
-                      } else if (isAction) {
-                        switchCompanyAndTab(item.companyId, 'actions');
                       } else {
-                        switchCompanyAndTab(item.companyId, 'invoices');
+                        switchCompanyAndTab(item.companyId, 'actions');
                       }
                     }}
                     className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-indigo-600 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer flex-1 justify-center"
@@ -439,7 +426,7 @@ export const PortfolioOverview: React.FC = () => {
                     <td className="py-4 px-4">
                       <div>
                         <div className="font-semibold text-slate-900">
-                          ₹{(company.monthlyRevenue / 100000).toFixed(1)}L / mo
+                          {formatLakhs(company.monthlyRevenue, 1)} / mo
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                           Runway: <span className="font-medium text-slate-700">{company.cashRunwayMonths} Mo</span>
