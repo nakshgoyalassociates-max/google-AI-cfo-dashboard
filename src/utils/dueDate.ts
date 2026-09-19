@@ -26,15 +26,29 @@ function parseDeadlineDateToIso(deadlineStr?: string): string | null {
 /**
  * Checks if a compliance item is completely filed (Subtask 3 completed)
  */
-export function isComplianceFiled(item: ComplianceItem): boolean {
+export function isComplianceFiled(item?: ComplianceItem | null): boolean {
+  if (!item) return false;
   return Boolean(item.subtasks && item.subtasks[2]?.status === 'completed');
 }
 
 /**
  * Returns the active or next statutory due date for a compliance item in ISO (YYYY-MM-DD) format
  */
-export function nextDueDate(item: ComplianceItem): string | null {
+export function nextDueDate(item?: ComplianceItem | null): string | null {
+  if (!item) return null;
+
   if (!item.dueDates || item.dueDates.length === 0) {
+    // Fallback: check if item has direct nextDueDate or statutoryDueDate
+    if ((item as any).nextDueDate && typeof (item as any).nextDueDate === 'string') {
+      const parsed = parseDeadlineDateToIso((item as any).nextDueDate);
+      if (parsed) return parsed;
+      if (/^\d{4}-\d{2}-\d{2}$/.test((item as any).nextDueDate)) return (item as any).nextDueDate;
+    }
+    if (item.statutoryDueDate && typeof item.statutoryDueDate === 'string') {
+      const parsed = parseDeadlineDateToIso(item.statutoryDueDate);
+      if (parsed) return parsed;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(item.statutoryDueDate)) return item.statutoryDueDate;
+    }
     // Fallback: try parsing from subtask 3 deadline if present
     const parsedSubtaskDate = parseDeadlineDateToIso(item.subtasks?.[2]?.deadline);
     if (parsedSubtaskDate) return parsedSubtaskDate;
@@ -76,7 +90,8 @@ export function nextDueDate(item: ComplianceItem): string | null {
  * Returns the integer number of calendar days from reference date (default: now) until the next due date.
  * Positive = future, 0 = today, Negative = overdue.
  */
-export function daysUntilDue(item: ComplianceItem, referenceDate?: Date): number | null {
+export function daysUntilDue(item?: ComplianceItem | null, referenceDate?: Date): number | null {
+  if (!item) return null;
   const due = nextDueDate(item);
   if (!due) return null;
 
@@ -98,9 +113,10 @@ export function daysUntilDue(item: ComplianceItem, referenceDate?: Date): number
  * - 'upcoming': more than 7 days away
  */
 export function dueStatus(
-  item: ComplianceItem,
+  item?: ComplianceItem | null,
   referenceDate?: Date
 ): 'overdue' | 'due-soon' | 'upcoming' | 'filed' {
+  if (!item) return 'upcoming';
   if (isComplianceFiled(item)) {
     return 'filed';
   }
@@ -121,7 +137,7 @@ export function dueStatus(
 /**
  * Formats an ISO string (YYYY-MM-DD) to "DD Mon YYYY" (e.g., "20 Sep 2026")
  */
-export function formatDueDate(isoString: string | null): string {
+export function formatDueDate(isoString: string | null | undefined): string {
   if (!isoString) return '—';
   const parts = isoString.split('-');
   if (parts.length !== 3) return isoString;
@@ -139,7 +155,11 @@ export function formatDueDate(isoString: string | null): string {
 /**
  * Comparator to sort compliance items ascending by their next due date
  */
-export function compareDueDates(a: ComplianceItem, b: ComplianceItem): number {
+export function compareDueDates(a?: ComplianceItem | null, b?: ComplianceItem | null): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
   const dateA = nextDueDate(a);
   const dateB = nextDueDate(b);
 

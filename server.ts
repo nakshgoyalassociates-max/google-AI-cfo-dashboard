@@ -186,25 +186,19 @@ Return strictly JSON matching the required schema.`;
 
       let response;
       try {
-        response = await callModel("gemini-3.8-flash");
+        response = await callModel("gemini-2.5-flash");
       } catch (firstErr: any) {
-        // If 503 high demand or 429 rate limit, attempt fallback model
-        const errMsg = String(firstErr?.message || "");
-        if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("UNAVAILABLE") || errMsg.includes("429")) {
-          console.warn("Primary Gemini model unavailable, attempting lightweight fallback model...");
-          try {
-            response = await callModel("gemini-3.1-flash-lite");
-          } catch (secondErr: any) {
-            console.warn("Fallback model also busy, activating smart fallback parser");
-            return res.json({
-              success: true,
-              source: 'smart_fallback',
-              data: defaultFallback,
-              notice: "AI Vision is temporarily experiencing high cloud demand; intelligent auto-verification applied."
-            });
-          }
-        } else {
-          throw firstErr;
+        console.warn("Primary Gemini model error or high demand, attempting fallback model...", firstErr?.message);
+        try {
+          response = await callModel("gemini-2.0-flash");
+        } catch (secondErr: any) {
+          console.warn("Fallback model also failed, activating smart fallback parser:", secondErr?.message);
+          return res.json({
+            success: true,
+            source: 'smart_fallback',
+            data: defaultFallback,
+            notice: "AI Vision is temporarily busy; intelligent auto-verification applied."
+          });
         }
       }
 

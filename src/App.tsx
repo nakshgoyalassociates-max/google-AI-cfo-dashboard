@@ -9,24 +9,23 @@ import { ActionPendenciesTab } from './components/actions/ActionPendenciesTab';
 import { FinancialMisTab } from './components/mis/FinancialMisTab';
 import { NewActionModal } from './components/modals/NewActionModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { ComplianceDetailModal } from './components/modals/ComplianceDetailModal';
 import { ShieldCheck, CheckCircle, AlertCircle, Info, Sparkles } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
   const { activeTab, role, toastMessage, clientProfile } = useApp();
 
   const renderContent = () => {
-    // 1. Client Team: Access restricted ONLY to Compliance Master and Action Items
+    // 1. Client Team: Access to Compliances, Action Items, and Financial MIS (to update/upload data & variance explanations)
     if (role === 'client_team') {
+      if (activeTab === 'dashboard') return <ClientTeamDashboard />;
+      if (activeTab === 'mis') return <FinancialMisTab />;
       if (activeTab === 'actions') return <ActionPendenciesTab />;
       return <ComplianceMasterTab />;
     }
 
-    // 2. Client: Can view all tabs except CFO Dashboard (Dashboard renders Summarised Client Dashboard)
+    // 2. Client: Strictly limited to ONLY ONE comprehensive all-in-one dashboard
     if (role === 'client') {
-      if (activeTab === 'dashboard') return <ClientDashboard />;
-      if (activeTab === 'compliances') return <ComplianceMasterTab />;
-      if (activeTab === 'actions') return <ActionPendenciesTab />;
-      if (activeTab === 'mis') return <FinancialMisTab />;
       return <ClientDashboard />;
     }
 
@@ -51,6 +50,7 @@ const MainLayout: React.FC = () => {
       {/* Modals */}
       <NewActionModal />
       <AuthModal />
+      <ComplianceDetailModal />
 
       {/* Toast Notification Container */}
       {toastMessage && (

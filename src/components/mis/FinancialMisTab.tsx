@@ -43,6 +43,7 @@ import {
   Info,
   Scale,
   ArrowRightLeft,
+  ArrowRight,
   Users,
   LayoutDashboard,
   FileText,
@@ -556,7 +557,7 @@ export const FinancialMisTab: React.FC = () => {
             <span>{isExcelPanelOpen ? 'Hide Upload' : 'Upload Excel'}</span>
           </button>
 
-          {role === 'cfo' && (
+          {(role === 'cfo' || role === 'client_team') && (
             <button
               onClick={() => {
                 if (isEditing) {
@@ -574,6 +575,33 @@ export const FinancialMisTab: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Operational Role Banner for Client Team */}
+      {role === 'client_team' && (
+        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-sky-900 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shrink-0">
+              <Upload className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold flex items-center gap-2">
+                <span>Client Finance Desk Operational Access</span>
+                <span className="px-2 py-0.2 rounded-full bg-sky-200 text-sky-800 text-[10px] font-semibold">Data Upload & Variance Center</span>
+              </div>
+              <p className="text-[11px] text-sky-700 mt-0.5">
+                You can upload monthly financials via Excel, update metric balances directly, and provide operational explanations for budget variances exceeding ±5%.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveSubTab('budget')}
+            className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Review & Explain Variances</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Hidden File Input for Excel */}
       <input

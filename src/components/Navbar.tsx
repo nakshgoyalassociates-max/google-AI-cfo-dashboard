@@ -183,11 +183,58 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs / Client Single Dashboard Bar */}
         <div className="flex items-center justify-between overflow-x-auto py-1.5">
-          <nav className="flex items-center gap-1">
-            {/* Dashboard Tab - Hidden for Client Team, Available for Client (Executive Summary) and CFO (Portfolio/Surveillance) */}
-            {role !== 'client_team' && (
+          {role === 'client' ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white font-semibold text-xs shadow-xs">
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Executive All-in-One Dashboard</span>
+                </div>
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 pl-1">
+                  <span className="text-slate-300">•</span>
+                  <span>Unified view of MIS, Compliance, Actions, Ratios & Company Health</span>
+                </div>
+              </div>
+
+              {/* Quick in-page section jumps */}
+              <div className="flex items-center gap-1 text-xs">
+                <a
+                  href="#health-charts"
+                  className="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-[11px] transition-colors"
+                >
+                  Health & Trends
+                </a>
+                <a
+                  href="#financial-ratios"
+                  className="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-[11px] transition-colors"
+                >
+                  MIS Ratios
+                </a>
+                <a
+                  href="#compliance-status"
+                  className="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-[11px] transition-colors"
+                >
+                  Compliances
+                </a>
+                <a
+                  href="#action-status"
+                  className="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-[11px] transition-colors"
+                >
+                  Actions
+                </a>
+                <a
+                  href="#core-statements"
+                  className="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-[11px] transition-colors"
+                >
+                  Statements
+                </a>
+              </div>
+            </div>
+          ) : (
+            <nav className="flex items-center gap-1">
+              {/* Dashboard / Workstation Tab */}
               <button
                 id="nav-tab-dashboard"
                 onClick={() => setActiveTab('dashboard')}
@@ -201,7 +248,9 @@ export const Navbar: React.FC = () => {
                 <span>
                   {role === 'cfo' 
                     ? (cfoViewMode === 'portfolio' ? 'CFO Dashboard (All Companies)' : 'CFO Company Workspace') 
-                    : 'Executive Summary Dashboard'}
+                    : role === 'client_team'
+                      ? 'Team Workstation'
+                      : 'Executive Summary Dashboard'}
                 </span>
                 {role === 'cfo' && criticalDelayedItems.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-bold animate-pulse">
@@ -209,48 +258,46 @@ export const Navbar: React.FC = () => {
                   </span>
                 )}
               </button>
-            )}
 
-            {/* Compliance Master - Accessible to All Roles */}
-            <button
-              id="nav-tab-compliances"
-              onClick={() => setActiveTab('compliances')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === 'compliances'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <CalendarClock className="w-3.5 h-3.5" />
-              <span>Compliance Master</span>
-              <span className={`ml-1 text-[10px] font-normal ${activeTab === 'compliances' ? 'text-slate-300' : 'text-slate-400'}`}>
-                ({stats.fullyCompletedCompliances}/{stats.totalCompliances})
-              </span>
-            </button>
-
-            {/* Action Items - Accessible to All Roles */}
-            <button
-              id="nav-tab-actions"
-              onClick={() => setActiveTab('actions')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === 'actions'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span>Action Items</span>
-              {stats.pendingActions > 0 && (
-                <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
-                  activeTab === 'actions' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
-                }`}>
-                  {stats.pendingActions}
+              {/* Compliance Master - Accessible to All Roles */}
+              <button
+                id="nav-tab-compliances"
+                onClick={() => setActiveTab('compliances')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'compliances'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <CalendarClock className="w-3.5 h-3.5" />
+                <span>Compliance Master</span>
+                <span className={`ml-1 text-[10px] font-normal ${activeTab === 'compliances' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  ({stats.fullyCompletedCompliances}/{stats.totalCompliances})
                 </span>
-              )}
-            </button>
+              </button>
 
-            {/* Financial MIS - Encompassing Statements, Working Capital & Budget/Variance */}
-            {role !== 'client_team' && (
+              {/* Action Items - Accessible to All Roles */}
+              <button
+                id="nav-tab-actions"
+                onClick={() => setActiveTab('actions')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  activeTab === 'actions'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>Action Items</span>
+                {stats.pendingActions > 0 && (
+                  <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                    activeTab === 'actions' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {stats.pendingActions}
+                  </span>
+                )}
+              </button>
+
+              {/* Financial MIS - Encompassing Statements, Working Capital & Budget/Variance (CFO & Client Team) */}
               <button
                 id="nav-tab-mis"
                 onClick={() => setActiveTab('mis')}
@@ -263,13 +310,17 @@ export const Navbar: React.FC = () => {
                 <BarChart3 className="w-3.5 h-3.5" />
                 <span>Financial MIS</span>
                 <span className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-medium ${
-                  activeTab === 'mis' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
+                  activeTab === 'mis' 
+                    ? 'bg-slate-800 text-slate-200' 
+                    : role === 'client_team' 
+                      ? 'bg-sky-100 text-sky-700 font-semibold' 
+                      : 'bg-slate-100 text-slate-600'
                 }`}>
-                  MIS & Budget
+                  {role === 'client_team' ? 'Update & Variance' : 'MIS & Budget'}
                 </span>
               </button>
-            )}
-          </nav>
+            </nav>
+          )}
 
           <div className="hidden lg:flex items-center gap-2 text-xs text-slate-500">
             {role === 'client_team' ? (

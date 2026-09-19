@@ -13,6 +13,7 @@ import {
   computeMonthGrandSummary 
 } from '../../data/mockBudgetData';
 import { ExcelUploadBudgetModal } from './ExcelUploadBudgetModal';
+import { VarianceExplanationModal } from './VarianceExplanationModal';
 import { exportVarianceReportExcel, generateBudgetTemplateExcel } from '../../utils/excelBudgetHelper';
 import { formatINR, formatVariance, formatPercent } from '../../utils/format';
 import { 
@@ -34,7 +35,8 @@ import {
   Info,
   Building,
   Check,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 export const BudgetTab: React.FC = () => {
@@ -47,15 +49,20 @@ export const BudgetTab: React.FC = () => {
     bulkUpdateActualsFromExcel,
     resetBudgetData,
     clientProfile,
-    role
+    role,
+    showToast
   } = useApp();
 
   // View Controls
   const [viewMode, setViewMode] = useState<'single_month' | 'annual_matrix'>('single_month');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | BudgetCategory>('ALL');
-  const [varianceFilter, setVarianceFilter] = useState<'ALL' | 'EXCEEDING_5' | 'ADVERSE_ONLY'>('ALL');
+  const [varianceFilter, setVarianceFilter] = useState<'ALL' | 'EXCEEDING_5' | 'ADVERSE_ONLY' | 'EXPLANATION_NEEDED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isExcelModalOpen, setIsExcelModalOpen] = useState<boolean>(false);
+  const [selectedItemForExplanation, setSelectedItemForExplanation] = useState<{
+    item: BudgetLineItem;
+    monthKey: BudgetMonthKey;
+  } | null>(null);
 
   // Inline editing state for fast manual adjustments
   const [editingCell, setEditingCell] = useState<{
@@ -71,6 +78,15 @@ export const BudgetTab: React.FC = () => {
   // Grand summary for selected month
   const monthSummary = useMemo(() => {
     return computeMonthGrandSummary(budgetItems, selectedBudgetMonth);
+  }, [budgetItems, selectedBudgetMonth]);
+
+  // Breaches requiring variance explanations
+  const unexplainedBreachesCount = useMemo(() => {
+    return budgetItems.filter(item => {
+      const vr = calculateItemVariance(item, selectedBudgetMonth);
+      const hasNote = Boolean(item.monthly[selectedBudgetMonth]?.notes && item.monthly[selectedBudgetMonth]?.notes?.trim() !== '');
+      return vr.isExceeding5Percent && !hasNote;
+    }).length;
   }, [budgetItems, selectedBudgetMonth]);
 
   // Filtered line items
@@ -96,6 +112,9 @@ export const BudgetTab: React.FC = () => {
         if (!vr.isExceeding5Percent) return false;
       } else if (varianceFilter === 'ADVERSE_ONLY') {
         if (!vr.isExceeding5Percent || vr.varianceType !== 'adverse') return false;
+      } else if (varianceFilter === 'EXPLANATION_NEEDED') {
+        const hasNote = Boolean(item.monthly[selectedBudgetMonth]?.notes && item.monthly[selectedBudgetMonth]?.notes?.trim() !== '');
+        if (!vr.isExceeding5Percent || hasNote) return false;
       }
 
       return true;
@@ -454,6 +473,18 @@ export const BudgetTab: React.FC = () => {
             >
               <span>Adverse Only ({monthSummary.totalAdverseBreaches})</span>
             </button>
+            <button
+              onClick={() => setVarianceFilter('EXPLANATION_NEEDED')}
+              className={`px-2.5 py-1 rounded-md font-medium cursor-pointer flex items-center gap-1 ${
+                varianceFilter === 'EXPLANATION_NEEDED'
+                  ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                  : 'text-indigo-700 hover:text-indigo-900'
+              }`}
+              title="Filter items with >5% variance that still require operational explanations"
+            >
+              <MessageSquare className="w-3 h-3" />
+              <span>Explanation Needed ({unexplainedBreachesCount})</span>
+            </button>
           </div>
 
           <button
@@ -722,16 +753,43 @@ export const BudgetTab: React.FC = () => {
                               )}
                             </td>
 
-                            {/* Reason / Notes */}
+                            {/* Reason / Notes (Variance Explanation) */}
                             <td className="py-3 px-4 text-slate-600">
                               {item.monthly[selectedBudgetMonth]?.notes ? (
-                                <span className="text-[11px] italic text-slate-700 font-medium">
-                                  "{item.monthly[selectedBudgetMonth]?.notes}"
-                                </span>
+                                <div 
+                                  onClick={() => setSelectedItemForExplanation({ item, monthKey: selectedBudgetMonth })}
+                                  className="group/note cursor-pointer p-2 rounded-lg hover:bg-slate-100/90 transition-all border border-slate-200/60 hover:border-slate-300 bg-slate-50/50"
+                                  title="Click to view or edit variance explanation"
+                                >
+                                  <div className="flex items-start justify-between gap-1.5">
+                                    <span className="text-[11px] italic text-slate-800 font-medium leading-relaxed">
+                                      "{item.monthly[selectedBudgetMonth]?.notes}"
+                                    </span>
+                                    <Edit3 className="w-3 h-3 text-slate-400 opacity-0 group-hover/note:opacity-100 shrink-0 mt-0.5" />
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[9px] text-emerald-700 font-semibold mt-1">
+                                    <CheckCircle2 className="w-2.5 h-2.5" />
+                                    <span>Explanation Logged</span>
+                                  </div>
+                                </div>
+                              ) : isBreach ? (
+                                <button
+                                  onClick={() => setSelectedItemForExplanation({ item, monthKey: selectedBudgetMonth })}
+                                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs w-full justify-center animate-pulse hover:animate-none"
+                                  title="Click to record operational justification for this variance breach"
+                                >
+                                  <Edit3 className="w-3 h-3 text-amber-800 shrink-0" />
+                                  <span>Put Variance Explanation</span>
+                                </button>
                               ) : (
-                                <span className="text-[11px] text-slate-400 italic">
-                                  Standard operations
-                                </span>
+                                <div 
+                                  onClick={() => setSelectedItemForExplanation({ item, monthKey: selectedBudgetMonth })}
+                                  className="group/note cursor-pointer p-1.5 rounded hover:bg-slate-100 flex items-center justify-between gap-1 text-slate-400 hover:text-slate-700 text-[11px] italic transition-colors"
+                                  title="Click to add custom operational notes or variance explanation"
+                                >
+                                  <span>Standard operations</span>
+                                  <Edit3 className="w-2.5 h-2.5 opacity-0 group-hover/note:opacity-100 text-slate-400" />
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -955,10 +1013,16 @@ export const BudgetTab: React.FC = () => {
                         const varPct = bgt > 0 && act > 0 ? ((act - bgt) / bgt) * 100 : 0;
                         const isBreach = act > 0 && Math.abs(varPct) > 5;
 
+                        const hasNote = Boolean(mData.notes && mData.notes.trim() !== '');
+
                         return (
                           <td 
                             key={m.key} 
-                            className={`py-2 px-2 text-right font-mono text-[11px] border-r border-slate-200 ${
+                            onClick={() => {
+                              setSelectedItemForExplanation({ item, monthKey: m.key });
+                            }}
+                            title={`Click to view/edit variance explanation for ${m.shortLabel}${mData.notes ? `: "${mData.notes}"` : ''}`}
+                            className={`py-2 px-2 text-right font-mono text-[11px] border-r border-slate-200 cursor-pointer hover:ring-1 hover:ring-indigo-400 transition-all ${
                               isBreach
                                 ? (item.category === 'sales'
                                     ? (varPct > 0 ? 'bg-emerald-50/70 text-emerald-900 font-bold' : 'bg-rose-50/70 text-rose-900 font-bold')
@@ -971,15 +1035,20 @@ export const BudgetTab: React.FC = () => {
                               <span className="font-semibold text-slate-800">
                                 {act > 0 ? `${(act / 1000).toFixed(0)}k` : '-'}
                               </span>
-                              <span className={`font-bold ${
-                                isBreach 
-                                  ? (item.category === 'sales'
-                                      ? (varPct > 0 ? 'text-emerald-600' : 'text-rose-600')
-                                      : (varPct > 0 ? 'text-rose-600' : 'text-emerald-600'))
-                                  : 'text-slate-400'
-                              }`}>
-                                {act > 0 ? `${varPct > 0 ? '+' : ''}${varPct.toFixed(0)}%` : '-'}
-                              </span>
+                              <div className="flex items-center gap-0.5">
+                                <span className={`font-bold ${
+                                  isBreach 
+                                    ? (item.category === 'sales'
+                                        ? (varPct > 0 ? 'text-emerald-600' : 'text-rose-600')
+                                        : (varPct > 0 ? 'text-rose-600' : 'text-emerald-600'))
+                                    : 'text-slate-400'
+                                }`}>
+                                  {act > 0 ? `${varPct > 0 ? '+' : ''}${varPct.toFixed(0)}%` : '-'}
+                                </span>
+                                {hasNote && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" title="Explanation logged" />
+                                )}
+                              </div>
                             </div>
                           </td>
                         );
@@ -1003,6 +1072,23 @@ export const BudgetTab: React.FC = () => {
         companyName={clientProfile.companyName}
         onApplyActuals={(monthKey, rows) => {
           bulkUpdateActualsFromExcel(monthKey, rows);
+        }}
+      />
+
+      {/* 9. Variance Explanation & Operational Reason Modal */}
+      <VarianceExplanationModal
+        isOpen={Boolean(selectedItemForExplanation)}
+        onClose={() => setSelectedItemForExplanation(null)}
+        item={selectedItemForExplanation?.item || null}
+        monthKey={selectedItemForExplanation?.monthKey || selectedBudgetMonth}
+        monthLabel={activeMonthMeta.label}
+        role={role}
+        onSave={(notes) => {
+          if (!selectedItemForExplanation) return;
+          const { item, monthKey } = selectedItemForExplanation;
+          const curActual = item.monthly[monthKey]?.actual || 0;
+          updateLineItemActual(item.id, monthKey, curActual, notes);
+          showToast(`Variance explanation updated for ${item.code}`);
         }}
       />
     </div>

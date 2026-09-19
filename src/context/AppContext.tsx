@@ -593,13 +593,116 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return !isNaN(d.getTime()) && d < now;
       }).length;
 
-      const pendingCompliances = compList
-        .filter(c => !c.subtasks || !c.subtasks[2] || c.subtasks[2].status !== 'completed')
+      const pendingCompliances = (compList || [])
+        .filter(c => c && (!c.subtasks || !c.subtasks[2] || c.subtasks[2].status !== 'completed'))
         .sort(compareDueDates);
       const earliestPending = pendingCompliances[0];
       const nextUpcomingDeadline = earliestPending 
         ? `${earliestPending.name} (${formatDueDate(nextDueDate(earliestPending))})` 
         : 'All filings up to date';
+
+      // Dynamic compliance health & synopsis
+      let complianceHealth: 'smooth' | 'attention' | 'critical' = 'smooth';
+      let complianceStatusSummary = 'Smooth • Filings On Track';
+      const hasOverdueFiling = compList.some(c => {
+        if (!c || !c.dueDates || !c.dueDates[0]) return false;
+        const isFiled = c.subtasks && c.subtasks[2]?.status === 'completed';
+        const d = new Date(c.dueDates[0]);
+        return !isFiled && !isNaN(d.getTime()) && d < now;
+      });
+
+      if (hasOverdueFiling) {
+        complianceHealth = 'critical';
+        complianceStatusSummary = 'Statutory Deadline Overdue';
+      } else if (cfoReviewPending > 0) {
+        complianceHealth = 'attention';
+        complianceStatusSummary = `${cfoReviewPending} Sign-Off${cfoReviewPending > 1 ? 's' : ''} Awaiting CFO`;
+      } else {
+        complianceStatusSummary = `Smooth • ${fullyCompleted}/${compList.length} Closed (${overallPct}%)`;
+      }
+
+      // Dynamic action deliverables health & synopsis
+      let actionHealth: 'smooth' | 'attention' | 'critical' = 'smooth';
+      let actionStatusSummary = 'Smooth • All On Track';
+      if (overdueActions > 0) {
+        actionHealth = 'critical';
+        actionStatusSummary = `${overdueActions} Action${overdueActions > 1 ? 's' : ''} Overdue`;
+      } else if (openActions > 4) {
+        actionHealth = 'attention';
+        actionStatusSummary = `${openActions} Actions Active (Review Load)`;
+      } else if (openActions > 0) {
+        actionHealth = 'smooth';
+        actionStatusSummary = `${openActions} Open • On Schedule`;
+      } else {
+        actionStatusSummary = 'Smooth • All Actions Done';
+      }
+
+      // Dynamic MIS & budget variance health
+      const bgtItems = allBudgetMap[company.id] || (company.id === 'client-101' ? INITIAL_NEXORA_BUDGET_ITEMS : []);
+      const majorVarianceItems: string[] = [];
+      bgtItems.forEach(item => {
+        const m = item.monthly?.['sep'] || item.monthly?.['aug'];
+        if (m && m.budget > 0 && m.actual > 0) {
+          const varPct = ((m.actual - m.budget) / m.budget) * 100;
+          if (item.type === 'expense' && varPct > 8) {
+            majorVarianceItems.push(`${item.name} (+${varPct.toFixed(1)}%)`);
+          } else if (item.type === 'income' && varPct < -8) {
+            majorVarianceItems.push(`${item.name} (${varPct.toFixed(1)}% dip)`);
+          }
+        }
+      });
+
+      if (company.id === 'client-102' && majorVarianceItems.length === 0) {
+        majorVarianceItems.push('Fleet Fuel & Maintenance (+12.2%)');
+      }
+
+      let misVarianceStatus: 'smooth' | 'moderate' | 'critical' = 'smooth';
+      let misHealth: 'smooth' | 'attention' | 'critical' = 'smooth';
+      let misStatusSummary = 'Smooth • No Major Deviation';
+
+      if (majorVarianceItems.length > 0 || (mis.creditorsOver45Days && mis.creditorsOver45Days > 300000)) {
+        if (majorVarianceItems.some(v => v.includes('+18') || v.includes('+12')) || (mis.creditorsOver45Days && mis.creditorsOver45Days > 400000)) {
+          misVarianceStatus = 'critical';
+          misHealth = 'critical';
+          misStatusSummary = `Major Deviation: ${majorVarianceItems[0] || 'MSME > 45d'}`;
+        } else {
+          misVarianceStatus = 'moderate';
+          misHealth = 'attention';
+          misStatusSummary = `Moderate Deviation: ${majorVarianceItems[0] || 'MSME Alert'}`;
+        }
+      } else if (mis.debtorDaysDSO > 50) {
+        misVarianceStatus = 'moderate';
+        misHealth = 'attention';
+        misStatusSummary = `DSO Elevated (${mis.debtorDaysDSO} days)`;
+      } else {
+        misStatusSummary = `Smooth • On Budget (Runway ${mis.cashRunwayMonths} Mo)`;
+      }
+
+      // Collate critical points for this company
+      const criticalPoints: string[] = [];
+      if (overdueActions > 0) {
+        criticalPoints.push(`${overdueActions} overdue action item${overdueActions > 1 ? 's' : ''} breaching SLA`);
+      }
+      if (cfoReviewPending > 0) {
+        criticalPoints.push(`${cfoReviewPending} compliance filing${cfoReviewPending > 1 ? 's' : ''} awaiting CFO review sign-off`);
+      }
+      if (majorVarianceItems.length > 0) {
+        criticalPoints.push(`Budget variance breach: ${majorVarianceItems.join(', ')}`);
+      }
+      if (mis.creditorsOver45Days && mis.creditorsOver45Days > 0) {
+        criticalPoints.push(`MSME Sec 43B(h): ₹${(mis.creditorsOver45Days / 100000).toFixed(1)}L payable > 45 days`);
+      }
+      if (mis.cashRunwayMonths < 8) {
+        criticalPoints.push(`Cash runway monitor: ${mis.cashRunwayMonths} months`);
+      }
+
+      // Determine overall company health: 'smooth' | 'attention' | 'critical'
+      let overallHealth: 'smooth' | 'attention' | 'critical' = 'smooth';
+      if (complianceHealth === 'critical' || actionHealth === 'critical' || misHealth === 'critical') {
+        overallHealth = 'critical';
+      } else if (complianceHealth === 'attention' || actionHealth === 'attention' || misHealth === 'attention') {
+        overallHealth = 'attention';
+      }
 
       return {
         companyId: company.id,
@@ -629,10 +732,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           taxPaid,
           taxPending
         },
-        mis
+        mis,
+        overallHealth,
+        complianceHealth,
+        actionHealth,
+        misHealth,
+        complianceStatusSummary,
+        actionStatusSummary,
+        misStatusSummary,
+        misVarianceStatus,
+        criticalPoints
       };
     });
-  }, [companies, allCompliancesMap, allActionsMap, allMISMap]);
+  }, [companies, allCompliancesMap, allActionsMap, allMISMap, allBudgetMap]);
 
   // Consolidated critical or delayed items across all companies
   const criticalDelayedItems = useMemo<CriticalDelayedItem[]>(() => {

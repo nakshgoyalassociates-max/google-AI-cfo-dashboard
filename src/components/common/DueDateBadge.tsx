@@ -4,7 +4,8 @@ import { nextDueDate, formatDueDate, dueStatus, daysUntilDue } from '../../utils
 import { CheckCircle2, AlertTriangle, Clock, Calendar } from 'lucide-react';
 
 interface DueDateBadgeProps {
-  item: ComplianceItem;
+  item?: ComplianceItem;
+  dueDate?: string;
   className?: string;
   showPrefix?: boolean;
   compact?: boolean;
@@ -12,14 +13,19 @@ interface DueDateBadgeProps {
 
 export const DueDateBadge: React.FC<DueDateBadgeProps> = ({
   item,
+  dueDate,
   className = '',
   showPrefix = true,
   compact = false,
 }) => {
-  const dueIso = nextDueDate(item);
-  const formattedDate = dueIso ? formatDueDate(dueIso) : item.statutoryDueDate;
-  const status = dueStatus(item);
-  const days = daysUntilDue(item);
+  const dueIso = item ? nextDueDate(item) : dueDate || null;
+  const formattedDate = dueIso 
+    ? formatDueDate(dueIso) 
+    : item?.statutoryDueDate 
+      ? item.statutoryDueDate 
+      : '—';
+  const status = item ? dueStatus(item) : (dueIso ? 'upcoming' : 'upcoming');
+  const days = item ? daysUntilDue(item) : null;
 
   const renderBadge = () => {
     switch (status) {

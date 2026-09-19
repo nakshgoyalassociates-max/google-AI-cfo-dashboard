@@ -1,6 +1,6 @@
 {
   "name": "Virtual CFO Suite",
-  "description": "Executive compliance management, broad financial MIS (Balance Sheet, P&L, Debtor Ageing, Fund Flow), and month-wise Budget & Variance analysis across 5 cost categories with Excel upload and 5% breach alerts.",
+  "description": "Executive compliance management, unified single-view client dashboard with broad company MIS, statutory filing status, operational actions, linked financial ratios, and graphical company health analysis.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

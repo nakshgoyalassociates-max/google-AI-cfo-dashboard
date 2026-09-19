@@ -373,6 +373,15 @@ export interface CompanyOverviewSummary {
     taxPending: number;
   };
   mis: FinancialMIS;
+  overallHealth: 'smooth' | 'attention' | 'critical';
+  complianceHealth: 'smooth' | 'attention' | 'critical';
+  actionHealth: 'smooth' | 'attention' | 'critical';
+  misHealth: 'smooth' | 'attention' | 'critical';
+  complianceStatusSummary: string;
+  actionStatusSummary: string;
+  misStatusSummary: string;
+  misVarianceStatus: 'smooth' | 'moderate' | 'critical';
+  criticalPoints: string[];
 }
 
 export interface CriticalDelayedItem {
